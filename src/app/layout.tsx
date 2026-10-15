@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "StudentStack",
-  description: "Free tools, discounts, credits, and scholarships for students — filtered to what you can actually use.",
+  description: "Free tools, discounts, and credits for students — filtered to what you can actually use.",
 };
 
 export default function RootLayout({
