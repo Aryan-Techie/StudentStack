@@ -1,7 +1,9 @@
 // Reads offers.json (raw studentoffers.co export) and normalizes it into
 // rows matching src/db/schema.ts. See PROGRESS.md §4.3 for the judgment
 // calls encoded below (category_sub -> tag, cost_type mapping, missing
-// claim_url handling, region collapsing).
+// claim_url handling). Region data is preserved per issue #74: the raw
+// location string is parsed into regions[]/regionLocked instead of
+// collapsing non-India regions to "Global".
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -21,7 +23,16 @@ export type NormalizedResource = {
   hasStaticClaimUrl: boolean;
   categorySlug: string;
   tags: string[];
+  // Legacy coarse region, kept for admin/UI compatibility: "IN" when the
+  // offer explicitly includes India, "Global" otherwise.
   region: "IN" | "Global";
+  // Preserved region data (issue #74): normalized region codes parsed from
+  // the raw location string, e.g. ["IN"], ["US"], ["GB"], ["EU"], or []
+  // when unrestricted. regionLocked is true when the offer is restricted
+  // to specific geographies — this is what distinguishes a US/UK/EU-only
+  // offer from a truly worldwide one.
+  regions: string[];
+  regionLocked: boolean;
   costType: "free" | "discount" | "stipend" | "scholarship" | "credits" | "trial";
   // Heuristically derived from offer/description/extra_info text by the
   // derive*() helpers below (issue #73). verificationNeeded always resolves
@@ -82,8 +93,46 @@ function slugifyCategory(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function toRegion(location: string | null): "IN" | "Global" {
-  return location === "India" ? "IN" : "Global";
+// Parses the raw offers.json location string into normalized region codes
+// (issue #74). Anything unrestricted (null/empty, "Global", "Worldwide",
+// "All") returns no regions with regionLocked = false; anything naming
+// specific geographies returns those codes with regionLocked = true.
+// Unrecognized geographies are kept as uppercased tokens (e.g. "CANADA")
+// rather than collapsed, so no location information is ever lost.
+const REGION_CODE_PATTERNS: [RegExp, string][] = [
+  [/india/i, "IN"],
+  [/united states|\busa?\b|america/i, "US"],
+  [/united kingdom|\buk\b|britain|england/i, "GB"],
+  [/\beu\b|europe/i, "EU"],
+];
+
+export function parseRegions(location: string | null): {
+  regions: string[];
+  regionLocked: boolean;
+} {
+  if (!location || !location.trim()) return { regions: [], regionLocked: false };
+  const regions: string[] = [];
+  const seen = new Set<string>();
+  let regionLocked = false;
+  for (const part of location.split(/[,;/|&+]|\band\b/i)) {
+    const p = part.trim();
+    if (!p) continue;
+    if (/^(global|worldwide|world|all|international|anywhere)$/i.test(p)) continue;
+    regionLocked = true;
+    let code: string | null = null;
+    for (const [pattern, c] of REGION_CODE_PATTERNS) {
+      if (pattern.test(p)) {
+        code = c;
+        break;
+      }
+    }
+    const normalized = code ?? p.toUpperCase().replace(/\s+/g, "_");
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      regions.push(normalized);
+    }
+  }
+  return { regions, regionLocked };
 }
 
 function parseExtraInfo(raw: string | null): { notes: string[] } {
@@ -206,6 +255,9 @@ export function normalizeRawOffers(raw: RawOffer[]): {
 
     const hasStaticClaimUrl = Boolean(o.claim_url);
 
+    // Region data, preserved instead of collapsed (issue #74).
+    const { regions, regionLocked } = parseRegions(o.location);
+
     // Signal text for the heuristic classifiers: tagline + description +
     // extra_info notes (issue #73).
     const signalText = [o.offer, o.description, ...notes]
@@ -221,7 +273,9 @@ export function normalizeRawOffers(raw: RawOffer[]): {
       hasStaticClaimUrl,
       categorySlug: slugifyCategory(o.category_main),
       tags,
-      region: toRegion(o.location),
+      region: regions.includes("IN") ? "IN" : "Global",
+      regions,
+      regionLocked,
       costType: o.tag2 ? (COST_TYPE_MAP[o.tag2] ?? "free") : "free",
       verificationNeeded: deriveVerificationNeeded(signalText),
       creditCardRequired: deriveCreditCardRequired(signalText) ?? undefined,
@@ -288,4 +342,11 @@ if (process.argv[1] && process.argv[1].endsWith("normalize-data.ts")) {
     `OK: ${categories.length} categories, ${resources.length} resources, ${noClaimUrl} without a static claim URL`,
   );
   console.log(`derived fields: ${JSON.stringify(derivedStats)}`);
+  const regionStats = {
+    indiaExclusive: resources.filter((r) => r.regions.includes("IN") && r.regionLocked).length,
+    worksInIndia: resources.filter((r) => r.regions.includes("IN") || !r.regionLocked).length,
+    foreignLocked: resources.filter((r) => r.regionLocked && !r.regions.includes("IN")).length,
+    worldwide: resources.filter((r) => !r.regionLocked).length,
+  };
+  console.log(`regions: ${JSON.stringify(regionStats)}`);
 }

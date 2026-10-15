@@ -23,6 +23,13 @@ export type Resource = {
   categoryIcon: string;
   tags: string[];
   region: "IN" | "Global";
+  // Preserved region availability (issue #74): normalized region codes
+  // (e.g. ["IN"], ["US"], [] when unrestricted) plus whether the offer is
+  // restricted to specific geographies. "Works in India" is
+  // IN ∈ regions || !regionLocked — see worksInIndia() in
+  // src/lib/directory-filters.ts.
+  regions: string[];
+  regionLocked: boolean;
   costType: "free" | "discount" | "stipend" | "scholarship" | "credits" | "trial";
   verificationNeeded: "none" | "edu_email" | "github_student_pack" | "student_id" | null;
   creditCardRequired: boolean | null;
@@ -53,6 +60,8 @@ const resourceColumns = {
   categoryId: resources.categoryId,
   tags: resources.tags,
   region: resources.region,
+  regions: resources.regions,
+  regionLocked: resources.regionLocked,
   costType: resources.costType,
   verificationNeeded: resources.verificationNeeded,
   creditCardRequired: resources.creditCardRequired,

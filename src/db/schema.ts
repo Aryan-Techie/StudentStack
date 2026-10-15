@@ -41,6 +41,14 @@ export const resources = pgTable("resources", {
   region: text("region", { enum: ["IN", "Global"] })
     .notNull()
     .default("Global"),
+  // Raw region availability preserved from offers.json location data
+  // (issue #74). Previously everything non-India collapsed to "Global",
+  // which swallowed US/UK/EU-only offers. `regions` holds normalized
+  // region codes (e.g. ["IN"], ["US"], ["GB"], or [] when unrestricted);
+  // `regionLocked` is true when the offer is restricted to specific
+  // geographies. "Works in India" = IN ∈ regions || !regionLocked.
+  regions: text("regions").array().notNull().default([]),
+  regionLocked: boolean("region_locked").notNull().default(false),
   costType: text("cost_type", {
     enum: ["free", "discount", "stipend", "scholarship", "credits", "trial"],
   }).notNull(),

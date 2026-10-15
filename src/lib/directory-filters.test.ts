@@ -7,6 +7,7 @@ import {
   countByRegion,
   topTags,
   sortResources,
+  worksInIndia,
   type DirectoryFilters,
   type SortOption,
 } from "./directory-filters";
@@ -27,6 +28,8 @@ const sampleResources: Resource[] = [
     categoryIcon: "🛠️",
     tags: ["Web", "DevOps"],
     region: "IN",
+    regions: ["IN"],
+    regionLocked: true,
     costType: "free",
     verificationNeeded: "edu_email",
     creditCardRequired: false,
@@ -49,6 +52,8 @@ const sampleResources: Resource[] = [
     categoryIcon: "☁️",
     tags: ["Web", "Cloud"],
     region: "Global",
+    regions: [],
+    regionLocked: false,
     costType: "credits",
     verificationNeeded: "github_student_pack",
     creditCardRequired: true,
@@ -71,6 +76,8 @@ const sampleResources: Resource[] = [
     categoryIcon: "🎨",
     tags: ["Design", "macOS"],
     region: "Global",
+    regions: [],
+    regionLocked: false,
     costType: "discount",
     verificationNeeded: "student_id",
     creditCardRequired: null,
@@ -93,10 +100,36 @@ const sampleResources: Resource[] = [
     categoryIcon: "🤖",
     tags: ["AI", "Web"],
     region: "IN",
+    regions: ["IN"],
+    regionLocked: true,
     costType: "free",
     verificationNeeded: null,
     creditCardRequired: null,
     duration: "lifetime",
+    status: "active",
+    lastVerifiedAt: null,
+    deadline: null,
+  },
+  {
+    id: 5,
+    slug: "tool-us-only",
+    name: "Epsilon US",
+    tagline: "US-only student discount",
+    description: "Discount available to students in the United States only",
+    url: "https://example.com/epsilon",
+    hasStaticClaimUrl: false,
+    categoryId: 2,
+    categorySlug: "cloud-and-hosting",
+    categoryName: "Cloud & Hosting",
+    categoryIcon: "☁️",
+    tags: ["Web"],
+    region: "Global",
+    regions: ["US"],
+    regionLocked: true,
+    costType: "free",
+    verificationNeeded: null,
+    creditCardRequired: null,
+    duration: null,
     status: "active",
     lastVerifiedAt: null,
     deadline: null,
@@ -125,20 +158,36 @@ describe("directory-filters region filtering", () => {
 
   it("returns all resources when region is 'all'", () => {
     const results = applyFilters(sampleResources, { ...defaultFilters, region: "all" }, fuse);
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(5);
   });
 
-  it("filters to only India resources when region is 'IN'", () => {
+  it("filters to resources that work in India when region is 'IN'", () => {
     const results = applyFilters(sampleResources, { ...defaultFilters, region: "IN" }, fuse);
-    expect(results).toHaveLength(2);
-    expect(results.every((r) => r.region === "IN")).toBe(true);
-    expect(results.map((r) => r.slug)).toEqual(["tool-in", "tool-ai-in"]);
+    // India-exclusive + worldwide offers; the US-only offer is excluded.
+    expect(results).toHaveLength(4);
+    expect(results.map((r) => r.slug)).toEqual([
+      "tool-in",
+      "tool-global",
+      "tool-design-global",
+      "tool-ai-in",
+    ]);
   });
 
-  it("filters to only Global resources when region is 'Global'", () => {
+  it("excludes US-only offers from the India facet (issue #74)", () => {
+    const results = applyFilters(
+      sampleResources,
+      { ...defaultFilters, region: "IN", costType: ["free"] },
+      fuse,
+    );
+    expect(results.map((r) => r.slug).sort()).toEqual(["tool-ai-in", "tool-in"]);
+  });
+
+  it("filters to only truly worldwide resources when region is 'Global'", () => {
     const results = applyFilters(sampleResources, { ...defaultFilters, region: "Global" }, fuse);
+    // Region-locked foreign offers (e.g. US-only) are no longer collapsed
+    // into "Global".
     expect(results).toHaveLength(2);
-    expect(results.every((r) => r.region === "Global")).toBe(true);
+    expect(results.every((r) => !r.regionLocked)).toBe(true);
     expect(results.map((r) => r.slug)).toEqual(["tool-global", "tool-design-global"]);
   });
 
@@ -149,18 +198,32 @@ describe("directory-filters region filtering", () => {
       fuse,
       "region",
     );
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(3);
     expect(results.every((r) => r.costType === "free")).toBe(true);
   });
 });
 
+describe("worksInIndia", () => {
+  it("is true for India-exclusive offers", () => {
+    expect(worksInIndia(sampleResources[0])).toBe(true);
+  });
+
+  it("is true for worldwide (unrestricted) offers", () => {
+    expect(worksInIndia(sampleResources[1])).toBe(true);
+  });
+
+  it("is false for foreign-locked offers", () => {
+    expect(worksInIndia(sampleResources[4])).toBe(false);
+  });
+});
+
 describe("countByRegion", () => {
-  it("counts IN, Global, and total counts accurately for mixed resources", () => {
+  it("counts works-in-India, worldwide, and total accurately for mixed resources", () => {
     const counts = countByRegion(sampleResources);
     expect(counts).toEqual({
-      in: 2,
+      in: 4,
       global: 2,
-      all: 4,
+      all: 5,
     });
   });
 
@@ -173,11 +236,11 @@ describe("countByRegion", () => {
     });
   });
 
-  it("handles only Global resources", () => {
-    const globalOnly = sampleResources.filter((r) => r.region === "Global");
-    const counts = countByRegion(globalOnly);
+  it("handles only worldwide resources", () => {
+    const worldwideOnly = sampleResources.filter((r) => !r.regionLocked);
+    const counts = countByRegion(worldwideOnly);
     expect(counts).toEqual({
-      in: 0,
+      in: 2,
       global: 2,
       all: 2,
     });
@@ -190,6 +253,16 @@ describe("countByRegion", () => {
       in: 2,
       global: 0,
       all: 2,
+    });
+  });
+
+  it("counts the US-only offer under all but neither facet", () => {
+    const usOnly = sampleResources.filter((r) => r.slug === "tool-us-only");
+    const counts = countByRegion(usOnly);
+    expect(counts).toEqual({
+      in: 0,
+      global: 0,
+      all: 1,
     });
   });
 });
@@ -291,12 +364,12 @@ describe("aggregation helpers", () => {
   it("counts by category correctly", () => {
     const counts = countByCategory(sampleResources);
     expect(counts["developer-tools"]).toBe(1);
-    expect(counts["cloud-and-hosting"]).toBe(1);
+    expect(counts["cloud-and-hosting"]).toBe(2);
   });
 
   it("counts by costType correctly", () => {
     const counts = countByCostType(sampleResources);
-    expect(counts["free"]).toBe(2);
+    expect(counts["free"]).toBe(3);
     expect(counts["credits"]).toBe(1);
     expect(counts["discount"]).toBe(1);
   });
@@ -336,7 +409,8 @@ describe("sortResources", () => {
     const sorted = sortResources(sampleResources, "free-first", false);
     expect(sorted[0].costType).toBe("free");
     expect(sorted[1].costType).toBe("free");
-    expect(sorted[2].costType).not.toBe("free");
+    expect(sorted[2].costType).toBe("free");
+    expect(sorted[3].costType).not.toBe("free");
   });
 
   it("returns copy when default or unrecognized sort option", () => {

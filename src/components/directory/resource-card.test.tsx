@@ -17,6 +17,8 @@ const mockResource: Resource = {
   categoryIcon: "tool",
   tags: ["AI", "Web", "macOS"],
   region: "Global",
+  regions: [],
+  regionLocked: false,
   costType: "free",
   verificationNeeded: "github_student_pack",
   creditCardRequired: false,
