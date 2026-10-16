@@ -11,8 +11,10 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // Only link-checkable, admin-active resources — 'expired' is an admin
-  // decision, not something the cron should try to resurrect.
+  // Only link-checkable, admin-APPROVED resources — unapproved submissions
+  // (approved = false) must never be server-fetched (SSRF, see #88), and
+  // 'expired' is an admin decision, not something the cron should try to
+  // resurrect.
   const targets = await db
     .select({ id: schema.resources.id, url: schema.resources.url })
     .from(schema.resources)
@@ -20,6 +22,7 @@ export async function GET(request: Request) {
       and(
         isNotNull(schema.resources.url),
         eq(schema.resources.hasStaticClaimUrl, true),
+        eq(schema.resources.approved, true),
         ne(schema.resources.status, "expired"),
       ),
     );

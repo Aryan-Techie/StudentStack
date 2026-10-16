@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
 import { countPendingByUser, getCategories, isUrlListed } from "@/lib/resources";
 import { slugify, validateSubmission, type SubmissionErrors } from "@/lib/submissions";
+import { assertPublicUrl } from "@/lib/ssrf";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const MAX_PENDING_PER_STUDENT = 5;
@@ -82,6 +83,19 @@ export async function submitResource(_prev: SubmitState, formData: FormData): Pr
     categories.map((c) => c.id),
   );
   if (!result.ok) return { status: "error", message: "A few fields need a fix.", errors: result.errors, values };
+
+  // SSRF: never store (and later cron-fetch) a link that doesn't resolve to a
+  // public IP. Redirect chains are re-validated hop-by-hop in checkUrl too.
+  try {
+    await assertPublicUrl(result.value.url);
+  } catch {
+    return {
+      status: "error",
+      message: "A few fields need a fix.",
+      errors: { url: "That link doesn't resolve to a public website. Paste the offer's public page URL." },
+      values,
+    };
+  }
 
   if ((await countPendingByUser(user.id)) >= MAX_PENDING_PER_STUDENT) {
     return {

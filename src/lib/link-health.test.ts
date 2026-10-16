@@ -1,6 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { classifyCheck, checkUrl, runWithConcurrency } from '@/lib/link-health';
 
+const mockAssertPublicUrl = vi.hoisted(() => vi.fn());
+
+// Mock the SSRF guard at the module boundary (unit behavior of the guard
+// itself is covered in ssrf.test.ts); the redirect-hop tests below drive
+// per-URL allow/block decisions through this mock.
+vi.mock('@/lib/ssrf', () => ({
+  assertPublicUrl: mockAssertPublicUrl,
+  isRedirectStatus: (status: number) =>
+    status === 301 || status === 302 || status === 303 || status === 307 || status === 308,
+}));
+
+function redirectResponse(location: string) {
+  return {
+    status: 302,
+    ok: false,
+    headers: { get: (name: string) => (name.toLowerCase() === 'location' ? location : null) },
+  } as unknown as Response;
+}
+
 describe('link-health.ts', () => {
   describe('classifyCheck', () => {
     it('classifies successful check as active', () => {
@@ -17,6 +36,8 @@ describe('link-health.ts', () => {
 
     beforeEach(() => {
       vi.restoreAllMocks();
+      // By default every URL passes the SSRF guard; individual tests tighten it.
+      mockAssertPublicUrl.mockImplementation(async (raw: string) => raw);
     });
 
     afterEach(() => {
@@ -38,7 +59,7 @@ describe('link-health.ts', () => {
         'https://example.com/valid',
         expect.objectContaining({
           method: 'HEAD',
-          redirect: 'follow',
+          redirect: 'manual',
         })
       );
     });
@@ -152,6 +173,67 @@ describe('link-health.ts', () => {
       const result = await checkUrl('https://example.com/timeout', 100);
 
       expect(result).toEqual({ ok: false });
+    });
+
+    it('refuses to fetch a blocked URL without any network request', async () => {
+      mockAssertPublicUrl.mockRejectedValueOnce(new Error('SSRF guard: blocked'));
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch;
+
+      const result = await checkUrl('http://169.254.169.254/latest/meta-data/iam/security-credentials/');
+
+      expect(result).toEqual({ ok: false });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the guard rejects the URL', async () => {
+      mockAssertPublicUrl.mockRejectedValueOnce(new Error('SSRF guard: blocked'));
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch;
+
+      const result = await checkUrl('https://does-not-exist.invalid/offer');
+
+      expect(result).toEqual({ ok: false });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('follows a redirect to another public URL', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(redirectResponse('https://example.com/final'))
+        .mockResolvedValueOnce({ status: 200, ok: true } as Response);
+      globalThis.fetch = mockFetch;
+
+      const result = await checkUrl('https://example.com/short');
+
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://example.com/final', expect.anything());
+    });
+
+    it('blocks a redirect hop to a non-public URL', async () => {
+      mockAssertPublicUrl.mockImplementation(async (raw: string) => {
+        if (raw.includes('169.254.169.254')) throw new Error('SSRF guard: blocked');
+        return raw;
+      });
+      const mockFetch = vi.fn().mockResolvedValueOnce(redirectResponse('http://169.254.169.254/x'));
+      globalThis.fetch = mockFetch;
+
+      const result = await checkUrl('https://example.com/redirect-to-metadata');
+
+      expect(result).toEqual({ ok: false });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats an over-long redirect chain as broken', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(redirectResponse('https://example.com/loop'));
+      globalThis.fetch = mockFetch;
+
+      const result = await checkUrl('https://example.com/loop');
+
+      expect(result).toEqual({ ok: false });
+      // initial request + MAX_REDIRECTS (5) redirect hops = 6 fetches
+      expect(mockFetch).toHaveBeenCalledTimes(6);
     });
   });
 
