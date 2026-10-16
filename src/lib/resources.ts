@@ -180,6 +180,46 @@ export async function getResourcesWithDeadlines(): Promise<Resource[]> {
   }
 }
 
+// Per-resource SEO pages (/r/[slug]): a single resource by slug, approved
+// rows only — unknown or unapproved slugs resolve to null so the page can
+// answer 404. Falls back to mock data when no database is configured,
+// mirroring getAllResources.
+export async function getResourceBySlug(slug: string): Promise<Resource | null> {
+  if (!hasDatabase()) return MOCK_RESOURCES.find((r) => r.slug === slug) ?? null;
+  try {
+    const [row] = await db
+      .select(resourceColumns)
+      .from(resources)
+      .innerJoin(categories, eq(resources.categoryId, categories.id))
+      .where(and(eq(resources.slug, slug), eq(resources.approved, true)))
+      .limit(1);
+    return row ? toResource(row) : null;
+  } catch (error) {
+    console.warn("[StudentStack DB] getResourceBySlug query failed:", error instanceof Error ? error.message : error);
+    return MOCK_RESOURCES.find((r) => r.slug === slug) ?? null;
+  }
+}
+
+// Sitemap: every approved resource slug plus its last update, so
+// /sitemap.xml can list all per-resource pages with fresh lastModified dates.
+export async function getAllResourceSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {
+  const mockFallback = () =>
+    MOCK_RESOURCES.map((r) => ({
+      slug: r.slug,
+      updatedAt: new Date(r.lastVerifiedAt ?? Date.now()),
+    }));
+  if (!hasDatabase()) return mockFallback();
+  try {
+    return await db
+      .select({ slug: resources.slug, updatedAt: resources.updatedAt })
+      .from(resources)
+      .where(eq(resources.approved, true));
+  } catch (error) {
+    console.warn("[StudentStack DB] getAllResourceSlugs query failed:", error instanceof Error ? error.message : error);
+    return mockFallback();
+  }
+}
+
 // Admin-only: finds a row whether or not it's approved, so a pending
 // submission can be opened in the edit form before it goes live.
 export async function getResourceById(id: number): Promise<Resource | null> {
