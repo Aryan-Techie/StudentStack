@@ -58,6 +58,29 @@ export const PRESETS: Preset[] = [
     description: "Design and creative software offers for students.",
     filters: { category: ["design-and-creative"] },
   },
+  {
+    slug: "scholarships-for-indian-students",
+    label: "Scholarships",
+    title: "Scholarships and fellowships for Indian students",
+    description: "Scholarships and fellowships open to students in India.",
+    filters: { kind: ["scholarship", "fellowship"], region: "IN" },
+  },
+  {
+    slug: "open-source-programs",
+    label: "Open source",
+    title: "Open-source programs and mentorships",
+    description:
+      "Paid open-source mentorship programs like GSoC, LFX, Outreachy, MLH, and Season of KDE.",
+    filters: { kind: ["program"] },
+  },
+  {
+    slug: "paid-internships-india",
+    label: "Paid internships",
+    title: "Paid internships for students in India",
+    description:
+      "Research and industry internships with stipends open to students in India.",
+    filters: { kind: ["internship"], costType: ["stipend"] },
+  },
 ];
 
 export function getPreset(slug: string): Preset | undefined {
@@ -69,6 +92,7 @@ export function fullFilters(partial: Partial<DirectoryFilters>): DirectoryFilter
     search: "",
     category: [],
     region: "all",
+    kind: [],
     costType: [],
     tags: [],
     verificationNeeded: [],

@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { X, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { applyFilters, countByCategory, countByRegion, topTags, type DirectoryFilters, type RegionFilter } from "@/lib/directory-filters";
-import type { Category, Resource } from "@/lib/resources";
+import { applyFilters, countByCategory, countByKind, countByRegion, topTags, type DirectoryFilters, type RegionFilter } from "@/lib/directory-filters";
+import type { Category, Resource, ResourceKind } from "@/lib/resources";
 import { FilterPanel } from "./filter-panel";
 import { MobileFilterSheet } from "./mobile-filter-sheet";
 import { ResourceCard } from "./resource-card";
@@ -34,6 +34,43 @@ const DURATION_LABELS: Record<string, string> = {
 
 function parseListParam(param: string | null): string[] {
   return param ? param.split(",").filter(Boolean) : [];
+}
+
+// Phase 1 opportunity-kind chips (issue #81). The "Scholarships" chip covers
+// both scholarships and fellowships, matching the directory copy
+// ("Scholarships & Fellowships").
+const KIND_CHIPS: { key: string; label: string; kinds: ResourceKind[] }[] = [
+  { key: "all", label: "All", kinds: [] },
+  { key: "perk", label: "Perks", kinds: ["perk"] },
+  { key: "scholarship", label: "Scholarships", kinds: ["scholarship", "fellowship"] },
+  { key: "internship", label: "Internships", kinds: ["internship"] },
+  { key: "mentorship", label: "Mentorship", kinds: ["mentorship"] },
+  { key: "program", label: "Programs", kinds: ["program"] },
+];
+
+const KNOWN_KINDS = new Set<string>(KIND_CHIPS.flatMap((c) => c.kinds));
+
+function parseKindParam(param: string | null): string[] {
+  return parseListParam(param).filter((k) => KNOWN_KINDS.has(k));
+}
+
+function sameKindSet(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((k) => b.includes(k));
+}
+
+const KIND_VALUE_LABELS: Record<string, string> = {
+  perk: "Perks",
+  scholarship: "Scholarships",
+  fellowship: "Fellowships",
+  internship: "Internships",
+  mentorship: "Mentorship",
+  program: "Programs",
+};
+
+function kindSelectionLabel(kinds: string[]): string {
+  const chip = KIND_CHIPS.find((c) => c.key !== "all" && sameKindSet(c.kinds, kinds));
+  if (chip) return chip.label;
+  return kinds.map((k) => KIND_VALUE_LABELS[k] ?? k).join(", ");
 }
 
 function readStoredFilters(): Partial<DirectoryFilters> {
@@ -82,6 +119,11 @@ export function DirectoryClient({
     if (initialFilters?.region === "IN" || initialFilters?.region === "Global") return initialFilters.region;
     return "all";
   });
+  const [kind, setKind] = useState<string[]>(
+    searchParams.get("kind")
+      ? parseKindParam(searchParams.get("kind"))
+      : (initialFilters?.kind ?? []),
+  );
   const [costType, setCostType] = useState<string[]>(
     searchParams.get("cost") ? parseListParam(searchParams.get("cost")) : (initialFilters?.costType ?? []),
   );
@@ -116,6 +158,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     search?: string;
     category?: string[];
     region?: RegionFilter;
+    kind?: string[];
     costType?: string[];
     tags?: string[];
     verificationNeeded?: string[];
@@ -126,6 +169,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     const s = next.search ?? search;
     const c = next.category ?? category;
     const r = next.region ?? region;
+    const k = next.kind ?? kind;
     const ct = next.costType ?? costType;
     const t = next.tags ?? tags;
     const v = next.verificationNeeded ?? verificationNeeded;
@@ -134,6 +178,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     if (s) params.set("q", s);
     if (c.length) params.set("category", c.join(","));
     if (r !== "all") params.set("region", r);
+    if (k.length) params.set("kind", k.join(","));
     if (ct.length) params.set("cost", ct.join(","));
     if (t.length) params.set("tags", t.join(","));
     if (v.length) params.set("verification", v.join(","));
@@ -157,13 +202,14 @@ const searchInputRef = useRef<HTMLInputElement>(null);
       search: deferredSearch,
       category,
       region,
+      kind,
       costType,
       tags,
       verificationNeeded,
       creditCardRequired,
       duration,
     }),
-    [deferredSearch, category, region, costType, tags, verificationNeeded, creditCardRequired, duration],
+    [deferredSearch, category, region, kind, costType, tags, verificationNeeded, creditCardRequired, duration],
   );
 
   // Restore remembered filters after mount, only on a bare /directory visit
@@ -176,7 +222,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (initialFilters || searchParams.size > 0) return;
     const saved = readStoredFilters();
-    if (!saved.search && !saved.category?.length && !saved.region && !saved.costType?.length &&
+    if (!saved.search && !saved.category?.length && !saved.region && !saved.kind?.length && !saved.costType?.length &&
         !saved.tags?.length && !saved.verificationNeeded?.length && !saved.creditCardRequired?.length &&
         !saved.duration?.length) {
       return;
@@ -185,6 +231,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     if (saved.search) setSearch(saved.search);
     if (saved.category?.length) setCategory(saved.category);
     if (saved.region && (saved.region === "IN" || saved.region === "Global")) setRegion(saved.region);
+    if (saved.kind?.length) setKind(parseKindParam(saved.kind.join(",")));
     if (saved.costType?.length) setCostType(saved.costType);
     if (saved.tags?.length) setTags(saved.tags);
     if (saved.verificationNeeded?.length) setVerificationNeeded(saved.verificationNeeded);
@@ -237,6 +284,29 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     [resources, filters, fuse],
   );
 
+  // Facet counts for the kind chip row: every OTHER active filter applies,
+  // the kind selection itself is skipped (issue #81).
+  const kindBase = useMemo(
+    () => applyFilters(resources, filters, fuse, "kind"),
+    [resources, filters, fuse],
+  );
+  const kindCounts = useMemo(() => countByKind(kindBase), [kindBase]);
+
+  function selectKind(kinds: ResourceKind[]) {
+    setKind(kinds);
+    syncUrl({ kind: kinds });
+  }
+
+  function kindChipCount(chip: (typeof KIND_CHIPS)[number]): number {
+    if (chip.key === "all") return kindBase.length;
+    return chip.kinds.reduce((sum, k) => sum + (kindCounts[k] ?? 0), 0);
+  }
+
+  const activeKindChip =
+    kind.length === 0
+      ? "all"
+      : (KIND_CHIPS.find((c) => c.key !== "all" && sameKindSet(c.kinds, kind))?.key ?? null);
+
   const topTagList = useMemo(() => topTags(resources, 8), [resources]);
 
   // Reset pagination when the active filters change. Adjusting state during
@@ -246,6 +316,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
   const filterKey = JSON.stringify([
     category,
     region,
+    kind,
     costType,
     tags,
     verificationNeeded,
@@ -319,6 +390,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     setSearch("");
     setCategory([]);
     setRegion("all");
+    setKind([]);
     setCostType([]);
     setTags([]);
     setVerificationNeeded([]);
@@ -331,6 +403,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     search ||
     category.length > 0 ||
     region !== "all" ||
+    kind.length > 0 ||
     costType.length > 0 ||
     tags.length > 0 ||
     verificationNeeded.length > 0 ||
@@ -345,6 +418,7 @@ const searchInputRef = useRef<HTMLInputElement>(null);
     creditCardRequired.length +
     duration.length +
     (region !== "all" ? 1 : 0) +
+    (kind.length > 0 ? 1 : 0) +
   (search ? 1 : 0);
 
 function moveCardFocus(direction: 1 | -1) {
@@ -452,6 +526,15 @@ useKeyboardShortcuts({
               setRegion("all");
               syncUrl({ region: "all" });
             },
+          },
+        ]
+      : []),
+    ...(kind.length > 0
+      ? [
+          {
+            key: "kind",
+            label: `Type: ${kindSelectionLabel(kind)}`,
+            onRemove: () => selectKind([]),
           },
         ]
       : []),
@@ -612,6 +695,23 @@ useKeyboardShortcuts({
       </aside>
 
       <div style={{ minWidth: 0 }}>
+        <div className={styles.kindBar} role="group" aria-label="Filter by opportunity type">
+          {KIND_CHIPS.map((chip) => {
+            const active = activeKindChip === chip.key;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => selectKind(chip.kinds)}
+                className={`${styles.kindChip} ${active ? styles.kindChipActive : ""}`}
+              >
+                {chip.label}
+                <span className={styles.kindCount}>{kindChipCount(chip)}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className={styles.resultsHead}>
           <FilterAnnouncer count={filtered.length} />
           <div className={styles.count}>
