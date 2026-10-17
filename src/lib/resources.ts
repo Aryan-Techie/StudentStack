@@ -334,6 +334,75 @@ export async function getResourcesBySlugs(slugs: string[]): Promise<FeaturedReso
   }
 }
 
+export type PopularResource = Pick<Resource, "slug" | "name" | "tagline" | "costType"> & {
+  weeklyClicks: number;
+};
+
+// "Popular this week" (issue #77): top clicked live resources over the last
+// 7 days, aggregated from click_events (written by POST
+// /api/resources/[id]/click, see #26). Only approved + active rows count.
+// Returns [] when no database is configured or when nothing was clicked in
+// the last 7 days — the homepage falls back to the curated FEATURED_SLUGS
+// ("The Real Numbers Rule": never show popularity backed by no data).
+export async function getPopularThisWeek(limit: number = 5): Promise<PopularResource[]> {
+  if (!hasDatabase()) return [];
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const clickEvents = schema.clickEvents;
+    const rows = await db
+      .select({
+        slug: resources.slug,
+        name: resources.name,
+        tagline: resources.tagline,
+        costType: resources.costType,
+        weeklyClicks: sql<number>`count(${clickEvents.id})`,
+      })
+      .from(clickEvents)
+      .innerJoin(resources, eq(clickEvents.resourceId, resources.id))
+      .where(
+        and(
+          sql`${clickEvents.createdAt} >= ${weekAgo}`,
+          eq(resources.approved, true),
+          eq(resources.status, "active"),
+        ),
+      )
+      .groupBy(resources.id, resources.slug, resources.name, resources.tagline, resources.costType)
+      .orderBy(sql`count(${clickEvents.id}) desc`)
+      .limit(limit);
+    return rows.map((row) => ({ ...row, weeklyClicks: Number(row.weeklyClicks) }));
+  } catch (error) {
+    console.warn("[StudentStack DB] getPopularThisWeek query failed:", error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
+// Live per-cost-type counts (approved + active only). Powers honest hero
+// copy (issue #77): the homepage only names cost types that actually have
+// live rows, so it never promises scholarships/stipends before Phase 1
+// data lands.
+export async function getLiveCostTypeCounts(): Promise<Record<string, number>> {
+  const empty: Record<string, number> = {};
+  if (!hasDatabase()) {
+    for (const r of MOCK_RESOURCES) {
+      if (r.status === "active") empty[r.costType] = (empty[r.costType] ?? 0) + 1;
+    }
+    return empty;
+  }
+  try {
+    const rows = await db
+      .select({ costType: resources.costType, count: sql<number>`count(*)` })
+      .from(resources)
+      .where(and(eq(resources.approved, true), eq(resources.status, "active")))
+      .groupBy(resources.costType);
+    const counts: Record<string, number> = {};
+    for (const row of rows) counts[row.costType] = Number(row.count);
+    return counts;
+  } catch (error) {
+    console.warn("[StudentStack DB] getLiveCostTypeCounts query failed:", error instanceof Error ? error.message : error);
+    return empty;
+  }
+}
+
 export type PendingSubmission = {
   id: number;
   name: string;

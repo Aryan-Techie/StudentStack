@@ -3,7 +3,8 @@ import styles from "@/components/home/brand.module.css";
 import { IdCard } from "@/components/home/id-card";
 import { SiteFooter, SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
-import { getCategoriesWithCounts, getHomeStats, getResourcesBySlugs } from "@/lib/resources";
+import { getCategoriesWithCounts, getHomeStats, getLiveCostTypeCounts, getPopularThisWeek, getResourcesBySlugs } from "@/lib/resources";
+import { heroLede } from "@/lib/home-copy";
 
 // See src/app/directory/page.tsx for why this is force-dynamic rather than
 // relying on revalidatePath to refresh a statically prerendered page.
@@ -26,11 +27,19 @@ const COST_LABELS = {
 } as const;
 
 export default async function Home() {
-  const [stats, categories, featured] = await Promise.all([
+  const [stats, categories, featured, popular, costCounts] = await Promise.all([
     getHomeStats(),
     getCategoriesWithCounts(),
     getResourcesBySlugs(FEATURED_SLUGS),
+    getPopularThisWeek(5),
+    getLiveCostTypeCounts(),
   ]);
+
+  // "Popular this week" is backed by real 7-day click data (issue #77);
+  // when nothing was clicked this week we fall back to the curated picks
+  // rather than showing popularity with no data behind it.
+  const showPopular = popular.length > 0;
+  const offers = showPopular ? popular : featured;
 
   const zones = categories.slice(0, 8).map(({ name, count }) => ({ name, count }));
   const stacks = Array.from({ length: Math.ceil(categories.length / PASSES_PER_STACK) }, (_, i) =>
@@ -49,7 +58,7 @@ export default async function Home() {
             Here’s the whole list.
           </h1>
           <p className={styles.lede}>
-            Free software, cloud credits, scholarships and discounts, sorted so you find yours fast. Found one we missed? Add it, and it goes live after a quick review.
+            {heroLede(costCounts)}
           </p>
           <form action="/directory" method="GET" role="search" className={styles.search}>
             <label htmlFor="home-search" className="sr-only">
@@ -70,18 +79,18 @@ export default async function Home() {
           />
         </section>
 
-        {featured.length > 0 && (
+        {offers.length > 0 && (
           <section className={styles.section}>
             <div className={`${styles.wrap} ${styles.split}`}>
               <div>
-                <h2 className={styles.sectionTitle}>A few things this pass opens</h2>
-                <p className={styles.sectionLede}>Straight from the directory, tagline for tagline.</p>
+                <h2 className={styles.sectionTitle}>{showPopular ? "Popular this week" : "A few things this pass opens"}</h2>
+                <p className={styles.sectionLede}>{showPopular ? "The most-clicked live offers of the last 7 days." : "Straight from the directory, tagline for tagline."}</p>
                 <Link href="/directory" className={styles.textLink}>
                   See all {stats.total}
                 </Link>
               </div>
               <ul className={styles.offers}>
-                {featured.map((offer) => (
+                {offers.map((offer) => (
                   <li key={offer.slug}>
                     <Link href={`/directory?q=${encodeURIComponent(offer.name)}`} className={styles.offerRow}>
                       <span className={styles.offerName}>{offer.name}</span>

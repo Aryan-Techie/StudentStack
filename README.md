@@ -2,7 +2,7 @@
 
 # StudentStack
 
-**Free tools, discounts, credits, scholarships, and opportunities for students — filtered to what you can actually use.**
+**Free tools, discounts, credits, and opportunities for students — filtered to what you can actually use.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
@@ -19,7 +19,7 @@
 
 ---
 
-StudentStack is a student-first resource directory for finding useful software, cloud credits, certifications, scholarships, internships, and other student offers — without digging through stale, single-category lists. The seeded dataset contains **593 resources across 15 categories**, with filters for category, region, cost type, and tags. Search is typo-tolerant, filters are reflected in the URL, and every resource carries a link-health status that a weekly cron job keeps current.
+StudentStack is a student-first resource directory for finding useful software, cloud credits, certifications, and other student offers — without digging through stale, single-category lists. The seeded dataset contains **593 resources across 15 categories**, with filters for category, region, cost type, and tags. Search is typo-tolerant, filters are reflected in the URL, and every resource carries a link-health status that a weekly cron job keeps current.
 
 > [!NOTE]
 > StudentStack runs on **your own Supabase (Postgres) project**. See [Getting Started](#getting-started) for how to provision one and wire up the environment variables.
