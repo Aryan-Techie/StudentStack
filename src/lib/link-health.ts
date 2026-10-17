@@ -1,3 +1,9 @@
+import { assertPublicUrl, isRedirectStatus } from "./ssrf";
+
+// Cap the redirect chain: endless or attacker-controlled redirect loops must
+// not turn the weekly cron into an unbounded fetch loop.
+const MAX_REDIRECTS = 5;
+
 export type CheckOutcome = { ok: boolean };
 
 // A resource is "broken" on a non-2xx/3xx status or a network error/timeout.
@@ -8,23 +14,57 @@ export function classifyCheck(outcome: CheckOutcome): "active" | "broken" {
 }
 
 export async function checkUrl(url: string, timeoutMs = 8000): Promise<CheckOutcome> {
-  const attempt = (method: "HEAD" | "GET") =>
-    fetch(url, {
+  // SSRF: refuse to fetch anything that doesn't resolve to a public IP.
+  try {
+    await assertPublicUrl(url);
+  } catch {
+    return { ok: false };
+  }
+
+  const attempt = (method: "HEAD" | "GET", target: string) =>
+    fetch(target, {
       method,
-      redirect: "follow",
+      // Redirects are followed manually (capped) below so every hop is
+      // re-validated against the SSRF guard — fetch's built-in "follow"
+      // cannot do that, and would happily chase a redirect to 169.254.169.254.
+      redirect: "manual",
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-  try {
-    let res = await attempt("HEAD");
-    if (res.status === 405 || res.status === 501) {
-      res = await attempt("GET");
+  const fetchChecked = async (method: "HEAD" | "GET", target: string): Promise<Response | null> => {
+    let current = target;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const res = await attempt(method, current);
+      if (!isRedirectStatus(res.status)) return res;
+      const location = res.headers.get("location");
+      if (!location) return res;
+      let next: URL;
+      try {
+        next = new URL(location, current);
+      } catch {
+        return res;
+      }
+      try {
+        await assertPublicUrl(next.toString());
+      } catch {
+        return null; // redirect target is not a public URL — treat as broken
+      }
+      current = next.toString();
+      if (res.status === 303) method = "GET";
     }
-    return { ok: res.ok };
+    return null; // redirect loop / chain too long — treat as broken
+  };
+
+  try {
+    let res = await fetchChecked("HEAD", url);
+    if (res && (res.status === 405 || res.status === 501)) {
+      res = await fetchChecked("GET", url);
+    }
+    return { ok: res !== null && res.ok };
   } catch {
     try {
-      const res = await attempt("GET");
-      return { ok: res.ok };
+      const res = await fetchChecked("GET", url);
+      return { ok: res !== null && res.ok };
     } catch {
       return { ok: false };
     }

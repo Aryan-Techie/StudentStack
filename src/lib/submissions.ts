@@ -1,4 +1,5 @@
 import type { Resource } from "@/lib/resources";
+import { isBlockedIp, METADATA_HOSTNAMES } from "@/lib/ip-ranges";
 
 export const SUBMISSION_COST_TYPES = ["free", "discount", "credits", "trial", "scholarship", "stipend"] as const;
 
@@ -28,6 +29,13 @@ export function normalizeUrl(raw: string): string | null {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
   if (!url.hostname.includes(".")) return null;
+  // Sync SSRF guard for IP literals (no DNS available here): reject
+  // private/loopback/link-local/reserved ranges outright, e.g.
+  // http://169.254.169.254/latest/meta-data/. Plain hostnames get the full
+  // DNS-based check server-side at submission time (assertPublicUrl).
+  const hostname = url.hostname.replace(/^\[|\]$/g, "");
+  if (isBlockedIp(hostname)) return null;
+  if (METADATA_HOSTNAMES.has(hostname.toLowerCase())) return null;
   url.hash = "";
   const text = url.toString();
   return url.pathname === "/" && !url.search ? text.replace(/\/$/, "") : text;
