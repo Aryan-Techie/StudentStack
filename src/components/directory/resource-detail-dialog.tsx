@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowUpRight, CheckCircle2, AlertTriangle, ShieldCheck, CreditCard, Clock, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -130,6 +131,9 @@ export function ResourceDetailDialog({
 
           {/* Action button */}
           <div className="pt-2 flex justify-end gap-2">
+            <Button variant="ghost" asChild>
+              <Link href={`/r/${resource.slug}`}>Open full page</Link>
+            </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>

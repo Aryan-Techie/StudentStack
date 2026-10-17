@@ -68,9 +68,8 @@ function verificationText(r: Resource): string {
 }
 
 function getResourceShareUrl(resource: Resource): string {
-  const query = encodeURIComponent(resource.name);
   const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
-  return `${origin}/directory?q=${query}`;
+  return `${origin}/r/${resource.slug}`;
 }
 
 function trackOfferClick(resourceId: number) {

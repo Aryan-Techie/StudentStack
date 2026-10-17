@@ -111,10 +111,9 @@ describe("ResourceCard copy link", () => {
       fireEvent.click(copyBtn);
     });
 
-    const expectedQuery = encodeURIComponent(mockResource.name);
     expect(writeTextMock).toHaveBeenCalledTimes(1);
     expect(writeTextMock).toHaveBeenCalledWith(
-      expect.stringContaining(`/directory?q=${expectedQuery}`)
+      expect.stringContaining(`/r/${mockResource.slug}`)
     );
 
     const toast = screen.getByRole("status");
