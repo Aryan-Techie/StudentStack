@@ -3,6 +3,15 @@ import type { Resource } from "@/lib/resources";
 
 export type RegionFilter = "all" | "IN" | "Global";
 
+// "Works in India" (issue #74): an offer works for Indian students when it
+// explicitly includes India in its preserved regions, or when it isn't
+// locked to specific foreign geographies (truly worldwide/unrestricted
+// offers). A US/UK/EU-only offer is regionLocked without IN in regions,
+// so it correctly does NOT match.
+export function worksInIndia(r: Pick<Resource, "region" | "regions" | "regionLocked">): boolean {
+  return r.regions.includes("IN") || !r.regionLocked || r.region === "IN";
+}
+
 export type DirectoryFilters = {
   search: string;
   category: string[];
@@ -28,7 +37,10 @@ export function applyFilters(
     list = list.filter((r) => filters.category.includes(r.categorySlug));
   }
   if (skip !== "region" && filters.region !== "all") {
-    list = list.filter((r) => r.region === filters.region);
+    // "IN" means "works in India" (India-exclusive + worldwide offers);
+    // "Global" means truly worldwide (not locked to any geography), so
+    // US/UK/EU-only offers appear under neither facet.
+    list = list.filter((r) => (filters.region === "IN" ? worksInIndia(r) : !r.regionLocked));
   }
   if (skip !== "costType" && filters.costType.length) {
     list = list.filter((r) => filters.costType.includes(r.costType));
@@ -80,14 +92,17 @@ export function countByCostType(resources: Resource[]): Record<string, number> {
   return counts;
 }
 
+// "in" = works in India (India-exclusive + worldwide), "global" = truly
+// worldwide (not region-locked), "all" = every resource — region-locked
+// foreign offers (e.g. US-only) appear only under "all".
 export function countByRegion(resources: Resource[]): { in: number; global: number; all: number } {
   let inCount = 0;
   let globalCount = 0;
   for (const r of resources) {
-    if (r.region === "IN") inCount++;
-    else globalCount++;
+    if (worksInIndia(r)) inCount++;
+    if (!r.regionLocked) globalCount++;
   }
-  return { in: inCount, global: globalCount, all: inCount + globalCount };
+  return { in: inCount, global: globalCount, all: resources.length };
 }
 
 export type SortOption = "relevance" | "verified" | "name-asc" | "name-desc" | "free-first";
@@ -122,9 +137,10 @@ export function sortResources(
 
 if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
   const fixture: Resource[] = [
-    { id: 1, slug: "a", name: "A", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["Web"], region: "IN", costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
-    { id: 2, slug: "b", name: "B", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 2, categorySlug: "dev", categoryName: "Dev", categoryIcon: "🛠️", tags: ["Web"], region: "Global", costType: "discount", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
-    { id: 3, slug: "c", name: "C", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["iOS"], region: "IN", costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
+    { id: 1, slug: "a", name: "A", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["Web"], region: "IN", regions: ["IN"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
+    { id: 2, slug: "b", name: "B", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 2, categorySlug: "dev", categoryName: "Dev", categoryIcon: "🛠️", tags: ["Web"], region: "Global", regions: [], regionLocked: false, costType: "discount", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
+    { id: 3, slug: "c", name: "C", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["iOS"], region: "IN", regions: ["IN"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
+    { id: 4, slug: "d", name: "D", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 2, categorySlug: "dev", categoryName: "Dev", categoryIcon: "🛠️", tags: ["Web"], region: "Global", regions: ["US"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
   ];
   const dummyFuse = { search: () => [] } as unknown as Fuse<Resource>;
   const noFilters: DirectoryFilters = {
@@ -138,7 +154,7 @@ if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
     duration: [],
   };
 
-  console.assert(applyFilters(fixture, noFilters, dummyFuse).length === 3, "no filters should return everything");
+  console.assert(applyFilters(fixture, noFilters, dummyFuse).length === 4, "no filters should return everything");
 
   const withCategory: DirectoryFilters = { ...noFilters, category: ["ai"] };
   console.assert(applyFilters(fixture, withCategory, dummyFuse).length === 2, "category filter should narrow to 2");
@@ -147,10 +163,10 @@ if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
   // category filter itself but still respect other active filters.
   const withRegionAndCategory: DirectoryFilters = { ...noFilters, region: "IN", category: ["dev"] };
   const forCounts = applyFilters(fixture, withRegionAndCategory, dummyFuse, "category");
-  console.assert(forCounts.length === 2, "skipping category should still apply the region filter");
+  console.assert(forCounts.length === 3, "skipping category should still apply the region filter (IN-exclusive + worldwide, not US-only)");
 
   const counts = countByCategory(fixture);
-  console.assert(counts["ai"] === 2 && counts["dev"] === 1, `unexpected counts: ${JSON.stringify(counts)}`);
+  console.assert(counts["ai"] === 2 && counts["dev"] === 2, `unexpected counts: ${JSON.stringify(counts)}`);
 
   console.assert(
     JSON.stringify(topTags(fixture, 1)) === JSON.stringify(["Web"]),
@@ -164,10 +180,18 @@ if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
   );
 
   const withGlobalRegion: DirectoryFilters = { ...noFilters, region: "Global" };
-  console.assert(applyFilters(fixture, withGlobalRegion, dummyFuse).length === 1, "global region should narrow to 1");
+  console.assert(applyFilters(fixture, withGlobalRegion, dummyFuse).length === 1, "global region should narrow to the truly worldwide offer only (US-only excluded)");
+
+  const withIndiaRegion: DirectoryFilters = { ...noFilters, region: "IN" };
+  const indiaResults = applyFilters(fixture, withIndiaRegion, dummyFuse);
+  console.assert(indiaResults.length === 3, "IN region should match India-exclusive + worldwide offers");
+  console.assert(
+    indiaResults.every((r) => worksInIndia(r)) && !indiaResults.some((r) => r.slug === "d"),
+    "US-only offer must not appear as available in India",
+  );
 
   const regionCounts = countByRegion(fixture);
-  console.assert(regionCounts.in === 2 && regionCounts.global === 1 && regionCounts.all === 3, "region counts should match fixture");
+  console.assert(regionCounts.in === 3 && regionCounts.global === 1 && regionCounts.all === 4, "region counts should match fixture");
 
   console.log("OK: directory-filters.ts self-check passed");
 }

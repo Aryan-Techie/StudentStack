@@ -47,6 +47,8 @@ async function main() {
       categoryId,
       tags: r.tags,
       region: r.region,
+      regions: r.regions,
+      regionLocked: r.regionLocked,
       costType: r.costType,
       verificationNeeded: r.verificationNeeded ?? null,
       creditCardRequired: r.creditCardRequired ?? null,
@@ -68,6 +70,8 @@ async function main() {
       categoryId: sql`excluded."category_id"`,
       tags: sql`excluded."tags"`,
       region: sql`excluded."region"`,
+      regions: sql`excluded."regions"`,
+      regionLocked: sql`excluded."region_locked"`,
       costType: sql`excluded."cost_type"`,
       // Backfill only: COALESCE keeps the stored value whenever an admin
       // has set one by hand (non-NULL), and takes the derived value only

@@ -7,6 +7,7 @@ import {
   deriveDuration,
   deriveVerificationNeeded,
   normalizeRawOffers,
+  parseRegions,
   type RawOffer,
 } from "./normalize-data";
 
@@ -176,5 +177,64 @@ describe("normalizeRawOffers", () => {
     expect(resources[0].creditCardRequired).toBeUndefined();
     expect(resources[0].duration).toBe("lifetime");
     expect(resources[0].verificationNeeded).toBe("none");
+  });
+});
+
+describe("parseRegions (issue #74)", () => {
+  it("maps India to locked IN regions", () => {
+    expect(parseRegions("India")).toEqual({ regions: ["IN"], regionLocked: true });
+  });
+
+  it("maps US / UK / EU locations to their locked codes", () => {
+    expect(parseRegions("US")).toEqual({ regions: ["US"], regionLocked: true });
+    expect(parseRegions("United States")).toEqual({ regions: ["US"], regionLocked: true });
+    expect(parseRegions("UK")).toEqual({ regions: ["GB"], regionLocked: true });
+    expect(parseRegions("United Kingdom")).toEqual({ regions: ["GB"], regionLocked: true });
+    expect(parseRegions("EU")).toEqual({ regions: ["EU"], regionLocked: true });
+    expect(parseRegions("Europe")).toEqual({ regions: ["EU"], regionLocked: true });
+  });
+
+  it("splits multi-region locations", () => {
+    expect(parseRegions("US and UK")).toEqual({
+      regions: ["US", "GB"],
+      regionLocked: true,
+    });
+    expect(parseRegions("India, US")).toEqual({
+      regions: ["IN", "US"],
+      regionLocked: true,
+    });
+  });
+
+  it("treats Global/Worldwide/empty locations as unrestricted", () => {
+    expect(parseRegions(null)).toEqual({ regions: [], regionLocked: false });
+    expect(parseRegions("")).toEqual({ regions: [], regionLocked: false });
+    expect(parseRegions("Global")).toEqual({ regions: [], regionLocked: false });
+    expect(parseRegions("Worldwide")).toEqual({ regions: [], regionLocked: false });
+  });
+
+  it("preserves unrecognized geographies as locked tokens instead of collapsing", () => {
+    const { regions, regionLocked } = parseRegions("Canada");
+    expect(regionLocked).toBe(true);
+    expect(regions).toEqual(["CANADA"]);
+  });
+});
+
+describe("normalizeRawOffers region preservation (issue #74)", () => {
+  it("keeps the legacy IN/Global region while preserving foreign-locked regions", () => {
+    const { resources } = normalizeRawOffers([
+      offer({ slug: "in", location: "India" }),
+      offer({ slug: "us", location: "US" }),
+      offer({ slug: "global", location: "Worldwide" }),
+    ]);
+    const bySlug = Object.fromEntries(resources.map((r) => [r.slug, r]));
+    expect(bySlug["in"].region).toBe("IN");
+    expect(bySlug["in"].regions).toEqual(["IN"]);
+    expect(bySlug["in"].regionLocked).toBe(true);
+    expect(bySlug["us"].region).toBe("Global");
+    expect(bySlug["us"].regions).toEqual(["US"]);
+    expect(bySlug["us"].regionLocked).toBe(true);
+    expect(bySlug["global"].region).toBe("Global");
+    expect(bySlug["global"].regions).toEqual([]);
+    expect(bySlug["global"].regionLocked).toBe(false);
   });
 });

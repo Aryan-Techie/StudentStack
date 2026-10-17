@@ -41,6 +41,8 @@ if (process.argv[1] && process.argv[1].endsWith("classify-match.ts")) {
       categoryIcon: "🛠️",
       tags: [],
       region: "Global",
+      regions: [],
+      regionLocked: false,
       costType: "free",
       verificationNeeded: null,
       creditCardRequired: null,
