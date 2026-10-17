@@ -4,7 +4,9 @@ import {
   applyFilters,
   countByCategory,
   countByCostType,
+  countByKind,
   countByRegion,
+  resourceKind,
   topTags,
   sortResources,
   worksInIndia,
@@ -140,6 +142,7 @@ const defaultFilters: DirectoryFilters = {
   search: "",
   category: [],
   region: "all",
+  kind: [],
   costType: [],
   tags: [],
   verificationNeeded: [],
@@ -217,8 +220,97 @@ describe("worksInIndia", () => {
   });
 });
 
-describe("countByRegion", () => {
-  it("counts works-in-India, worldwide, and total accurately for mixed resources", () => {
+describe("resourceKind", () => {
+  it("returns the resource kind when set", () => {
+    expect(resourceKind({ kind: "scholarship" })).toBe("scholarship");
+    expect(resourceKind({ kind: "internship" })).toBe("internship");
+  });
+
+  it("defaults kind-less resources to 'perk'", () => {
+    expect(resourceKind({})).toBe("perk");
+    expect(resourceKind({ kind: undefined })).toBe("perk");
+  });
+});
+
+describe("directory-filters kind filtering (issue #81)", () => {
+  const withKind: Resource[] = [
+    { ...sampleResources[0], kind: "scholarship" },
+    { ...sampleResources[1], kind: "internship" },
+    { ...sampleResources[2], kind: "program" },
+    { ...sampleResources[3] }, // kind-less → counts as "perk"
+    { ...sampleResources[4], kind: "fellowship" },
+  ];
+  const kindFuse = createFuse(withKind);
+
+  it("returns everything when kind is empty", () => {
+    const results = applyFilters(withKind, { ...defaultFilters, kind: [] }, kindFuse);
+    expect(results).toHaveLength(5);
+  });
+
+  it("filters to the selected kinds, treating kind-less resources as perks", () => {
+    const results = applyFilters(withKind, { ...defaultFilters, kind: ["perk"] }, kindFuse);
+    expect(results.map((r) => r.slug)).toEqual(["tool-ai-in"]);
+  });
+
+  it("supports multi-kind selections (the Scholarships chip)", () => {
+    const results = applyFilters(
+      withKind,
+      { ...defaultFilters, kind: ["scholarship", "fellowship"] },
+      kindFuse,
+    );
+    expect(results.map((r) => r.slug).sort()).toEqual(["tool-in", "tool-us-only"]);
+  });
+
+  it("skips kind filtering when skip is 'kind' (faceted counts)", () => {
+    const results = applyFilters(
+      withKind,
+      { ...defaultFilters, kind: ["perk"], region: "IN" },
+      kindFuse,
+      "kind",
+    );
+    // Region still applies (US-only excluded); the kind selection is ignored.
+    expect(results).toHaveLength(4);
+  });
+
+  it("combines with other active filters", () => {
+    const results = applyFilters(
+      withKind,
+      { ...defaultFilters, kind: ["program"], costType: ["discount"] },
+      kindFuse,
+    );
+    expect(results.map((r) => r.slug)).toEqual(["tool-design-global"]);
+  });
+});
+
+describe("countByKind", () => {
+  const withKind: Resource[] = [
+    { ...sampleResources[0], kind: "scholarship" },
+    { ...sampleResources[1], kind: "internship" },
+    { ...sampleResources[2], kind: "program" },
+    { ...sampleResources[3] }, // kind-less → "perk"
+    { ...sampleResources[4], kind: "fellowship" },
+  ];
+
+  it("counts each kind, defaulting kind-less resources to perk", () => {
+    expect(countByKind(withKind)).toEqual({
+      scholarship: 1,
+      internship: 1,
+      program: 1,
+      perk: 1,
+      fellowship: 1,
+    });
+  });
+
+  it("returns an empty object for no resources", () => {
+    expect(countByKind([])).toEqual({});
+  });
+
+  it("counts multiple resources of the same kind", () => {
+    expect(countByKind([...withKind, { ...sampleResources[0], kind: "scholarship" }]).scholarship).toBe(2);
+  });
+});
+
+describe("countByRegion", () => {  it("counts works-in-India, worldwide, and total accurately for mixed resources", () => {
     const counts = countByRegion(sampleResources);
     expect(counts).toEqual({
       in: 4,

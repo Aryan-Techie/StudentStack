@@ -1,7 +1,22 @@
 import type Fuse from "fuse.js";
-import type { Resource } from "@/lib/resources";
+import type { Resource, ResourceKind } from "@/lib/resources";
 
 export type RegionFilter = "all" | "IN" | "Global";
+
+// Phase 1 opportunity kinds (issue #81). A resource without a kind predates
+// the field and counts as a plain perk everywhere (filters, facet counts).
+export const RESOURCE_KINDS: readonly ResourceKind[] = [
+  "perk",
+  "scholarship",
+  "fellowship",
+  "internship",
+  "mentorship",
+  "program",
+];
+
+export function resourceKind(r: Pick<Resource, "kind">): ResourceKind {
+  return r.kind ?? "perk";
+}
 
 // "Works in India" (issue #74): an offer works for Indian students when it
 // explicitly includes India in its preserved regions, or when it isn't
@@ -16,6 +31,7 @@ export type DirectoryFilters = {
   search: string;
   category: string[];
   region: RegionFilter;
+  kind: string[];
   costType: string[];
   tags: string[];
   verificationNeeded: string[];
@@ -36,11 +52,13 @@ export function applyFilters(
   if (skip !== "category" && filters.category.length) {
     list = list.filter((r) => filters.category.includes(r.categorySlug));
   }
-  if (skip !== "region" && filters.region !== "all") {
-    // "IN" means "works in India" (India-exclusive + worldwide offers);
+  if (skip !== "region" && filters.region !== "all") {    // "IN" means "works in India" (India-exclusive + worldwide offers);
     // "Global" means truly worldwide (not locked to any geography), so
     // US/UK/EU-only offers appear under neither facet.
     list = list.filter((r) => (filters.region === "IN" ? worksInIndia(r) : !r.regionLocked));
+  }
+  if (skip !== "kind" && filters.kind.length) {
+    list = list.filter((r) => filters.kind.includes(resourceKind(r)));
   }
   if (skip !== "costType" && filters.costType.length) {
     list = list.filter((r) => filters.costType.includes(r.costType));
@@ -75,6 +93,17 @@ export function applyFilters(
 export function countByCategory(resources: Resource[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const r of resources) counts[r.categorySlug] = (counts[r.categorySlug] ?? 0) + 1;
+  return counts;
+}
+
+// Facet counts for the kind chip row (issue #81): kind-less resources count
+// as "perk", mirroring applyFilters.
+export function countByKind(resources: Resource[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const r of resources) {
+    const kind = resourceKind(r);
+    counts[kind] = (counts[kind] ?? 0) + 1;
+  }
   return counts;
 }
 
@@ -137,8 +166,8 @@ export function sortResources(
 
 if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
   const fixture: Resource[] = [
-    { id: 1, slug: "a", name: "A", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["Web"], region: "IN", regions: ["IN"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
-    { id: 2, slug: "b", name: "B", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 2, categorySlug: "dev", categoryName: "Dev", categoryIcon: "🛠️", tags: ["Web"], region: "Global", regions: [], regionLocked: false, costType: "discount", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
+    { id: 1, slug: "a", name: "A", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["Web"], region: "IN", regions: ["IN"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null, kind: "scholarship" },
+    { id: 2, slug: "b", name: "B", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 2, categorySlug: "dev", categoryName: "Dev", categoryIcon: "🛠️", tags: ["Web"], region: "Global", regions: [], regionLocked: false, costType: "discount", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null, kind: "internship" },
     { id: 3, slug: "c", name: "C", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 1, categorySlug: "ai", categoryName: "AI", categoryIcon: "🤖", tags: ["iOS"], region: "IN", regions: ["IN"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
     { id: 4, slug: "d", name: "D", tagline: null, description: "", url: null, hasStaticClaimUrl: false, categoryId: 2, categorySlug: "dev", categoryName: "Dev", categoryIcon: "🛠️", tags: ["Web"], region: "Global", regions: ["US"], regionLocked: true, costType: "free", verificationNeeded: null, creditCardRequired: null, duration: null, status: "active", lastVerifiedAt: null, deadline: null },
   ];
@@ -147,6 +176,7 @@ if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
     search: "",
     category: [],
     region: "all",
+    kind: [],
     costType: [],
     tags: [],
     verificationNeeded: [],
@@ -192,6 +222,18 @@ if (process.argv[1] && process.argv[1].endsWith("directory-filters.ts")) {
 
   const regionCounts = countByRegion(fixture);
   console.assert(regionCounts.in === 3 && regionCounts.global === 1 && regionCounts.all === 4, "region counts should match fixture");
+
+  // Kind filtering (issue #81): kind-less resources count as "perk".
+  const withKind: DirectoryFilters = { ...noFilters, kind: ["scholarship", "fellowship"] };
+  const kindResults = applyFilters(fixture, withKind, dummyFuse);
+  console.assert(kindResults.length === 1 && kindResults[0].slug === "a", "kind filter should match the scholarship only");
+
+  const withKindAndRegion: DirectoryFilters = { ...noFilters, kind: ["perk"], region: "IN" };
+  const kindCounts = countByKind(applyFilters(fixture, withKindAndRegion, dummyFuse, "kind"));
+  console.assert(
+    kindCounts["perk"] === 1 && kindCounts["scholarship"] === 1 && kindCounts["internship"] === 1,
+    `unexpected kind counts: ${JSON.stringify(kindCounts)}`,
+  );
 
   console.log("OK: directory-filters.ts self-check passed");
 }

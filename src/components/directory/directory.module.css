@@ -189,6 +189,65 @@
   color: var(--d-purple-ink);
 }
 
+/* ---------- Kind filter chips (issue #81) ---------- */
+.kindBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.kindChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--d-line);
+  color: var(--d-ink-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+.kindChip:hover {
+  border-color: var(--d-line-hover);
+  color: var(--d-ink);
+}
+
+.kindChipActive {
+  background: var(--d-purple-soft);
+  border-color: var(--d-purple-soft);
+  color: var(--d-purple-ink);
+  font-weight: 600;
+}
+
+.kindChipActive:hover {
+  background: var(--d-purple-soft);
+  color: var(--d-purple-ink);
+}
+
+.kindCount {
+  display: inline-flex;
+  align-items: center;
+  min-width: 20px;
+  justify-content: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--d-muted) 14%, transparent);
+  color: var(--d-muted);
+}
+
+.kindChipActive .kindCount {
+  background: color-mix(in srgb, var(--d-purple-ink) 14%, transparent);
+  color: var(--d-purple-ink);
+}
+
 /* ---------- Main Layout ---------- */
 .layout {
   display: grid;

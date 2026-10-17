@@ -9,6 +9,17 @@ function hasDatabase(): boolean {
   return Boolean(process.env.POSTGRES_URL);
 }
 
+// Phase 1 opportunity kinds (issue #81). Most directory entries are plain
+// perks; scholarships, fellowships, internships, mentorships, and programs
+// get their own filter chips and SEO preset pages.
+export type ResourceKind =
+  | "perk"
+  | "scholarship"
+  | "fellowship"
+  | "internship"
+  | "mentorship"
+  | "program";
+
 export type Resource = {
   id: number;
   slug: string;
@@ -23,6 +34,10 @@ export type Resource = {
   categoryIcon: string;
   tags: string[];
   region: "IN" | "Global";
+  // Phase 1 opportunities (issue #81): what kind of opportunity a resource
+  // is. Optional — resources that predate the field (and rows from a DB
+  // without the column) are treated as plain "perk" offers.
+  kind?: ResourceKind;
   // Preserved region availability (issue #74): normalized region codes
   // (e.g. ["IN"], ["US"], [] when unrestricted) plus whether the offer is
   // restricted to specific geographies. "Works in India" is
