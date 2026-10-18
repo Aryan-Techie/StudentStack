@@ -2,6 +2,7 @@ import { eq, and, isNotNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
 import { checkUrl, resolveStatusTransition, runWithConcurrency } from "@/lib/link-health";
+import { notifyBrokenLinks, type BrokenLink } from "@/lib/admin-notify";
 
 export const maxDuration = 270;
 
@@ -36,6 +37,9 @@ export async function GET(request: Request) {
   let active = 0;
   let expired = 0;
   const now = new Date();
+  // Issue #41: links that flipped to broken/expired in this run — the
+  // admin gets a proactive notification about exactly these.
+  const newlyFlagged: BrokenLink[] = [];
 
   await runWithConcurrency(targets, 25, async (target) => {
     const outcome = await checkUrl(target.url!);
@@ -49,6 +53,15 @@ export async function GET(request: Request) {
     if (transition.status === "broken") broken++;
     else if (transition.status === "expired") expired++;
     else active++;
+
+    if (transition.status !== target.status && transition.status !== "active") {
+      newlyFlagged.push({
+        id: target.id,
+        url: target.url!,
+        previousStatus: target.status,
+        newStatus: transition.status,
+      });
+    }
 
     await db
       .update(schema.resources)
@@ -69,5 +82,20 @@ export async function GET(request: Request) {
 
   const summary = { checked: targets.length, active, broken, expired, checkedAt: now.toISOString() };
   console.log("link-health run:", summary);
+
+  // Issue #41: proactively notify the admin about newly broken links.
+  // Opt-in via LINK_HEALTH_WEBHOOK_URL — without it the cron behaves
+  // exactly as before, and a notification failure never fails the run.
+  if (newlyFlagged.length > 0) {
+    const notification = await notifyBrokenLinks(newlyFlagged, summary);
+    if (notification.sent) {
+      console.log(
+        `link-health: notified admin about ${newlyFlagged.length} newly flagged link(s).`,
+      );
+    } else {
+      console.log(`link-health: admin notification skipped (${notification.reason}).`);
+    }
+  }
+
   return Response.json(summary);
 }
