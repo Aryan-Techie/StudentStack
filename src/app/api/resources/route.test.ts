@@ -34,6 +34,8 @@ const canned: PaginatedResources = {
       categoryIcon: "dev",
       tags: [],
       region: "Global",
+      regions: [],
+      regionLocked: false,
       costType: "free",
       verificationNeeded: "none",
       creditCardRequired: false,

@@ -31,6 +31,8 @@ function makeResource(deadline: number | null): Resource {
     categoryIcon: "dev",
     tags: [],
     region: "Global",
+    regions: [],
+    regionLocked: false,
     costType: "free",
     verificationNeeded: null,
     creditCardRequired: null,
