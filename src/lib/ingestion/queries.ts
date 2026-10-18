@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CandidateRow } from "./run-ingestion";
 
@@ -44,14 +44,33 @@ export async function getPendingCandidates(): Promise<{
   fresh: PendingCandidate[];
   possibleDuplicates: PendingCandidate[];
 }> {
-  const rows = await db
-    .select()
-    .from(schema.ingestionCandidates)
-    .where(eq(schema.ingestionCandidates.status, "pending"));
-  return {
-    fresh: rows.filter((r) => r.matchType === "new"),
-    possibleDuplicates: rows.filter((r) => r.matchType === "possible_duplicate"),
-  };
+  if (!process.env.POSTGRES_URL) return { fresh: [], possibleDuplicates: [] };
+  try {
+    const rows = await db
+      .select()
+      .from(schema.ingestionCandidates)
+      .where(eq(schema.ingestionCandidates.status, "pending"));
+    return {
+      fresh: rows.filter((r) => r.matchType === "new"),
+      possibleDuplicates: rows.filter((r) => r.matchType === "possible_duplicate"),
+    };
+  } catch (error) {
+    console.warn("[StudentStack DB] getPendingCandidates query failed:", error instanceof Error ? error.message : error);
+    return { fresh: [], possibleDuplicates: [] };
+  }
+}
+
+export async function getPendingCandidatesCount(): Promise<number> {
+  if (!process.env.POSTGRES_URL) return 0;
+  try {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.ingestionCandidates)
+      .where(eq(schema.ingestionCandidates.status, "pending"));
+    return Number(row?.count ?? 0);
+  } catch {
+    return 0;
+  }
 }
 
 export async function getCandidateById(id: number): Promise<PendingCandidate | undefined> {

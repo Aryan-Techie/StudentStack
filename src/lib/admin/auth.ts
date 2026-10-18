@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -6,7 +7,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 // in Phase 3. Authorization is "is this the one allow-listed email",
 // checked here AND independently inside every admin Server Action, per
 // Next.js's guidance that a layout/proxy check alone is not sufficient.
-export async function verifyAdmin(): Promise<{ email: string }> {
+// Wrapped in React.cache so layout + page calls within a single RSC render
+// pass only hit Supabase Auth once.
+export const verifyAdmin = cache(async (): Promise<{ email: string }> => {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -17,4 +20,5 @@ export async function verifyAdmin(): Promise<{ email: string }> {
   }
 
   return { email: user.email };
-}
+});
+

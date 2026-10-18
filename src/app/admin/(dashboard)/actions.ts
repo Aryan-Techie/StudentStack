@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
 import { verifyAdmin } from "@/lib/admin/auth";
 import { markCandidateReviewed } from "@/lib/ingestion/queries";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function parseTags(raw: FormDataEntryValue | null): string[] {
   return String(raw ?? "")
@@ -16,6 +17,7 @@ function parseTags(raw: FormDataEntryValue | null): string[] {
 function refreshPublicPages() {
   revalidatePath("/");
   revalidatePath("/directory");
+  revalidatePath("/deadlines");
 }
 
 export async function createResource(formData: FormData) {
@@ -60,9 +62,11 @@ export async function createResource(formData: FormData) {
   const candidateId = formData.get("candidateId");
   if (candidateId) {
     await markCandidateReviewed(Number(candidateId), "approved");
+    revalidatePath("/admin/ingestion");
   }
 
   refreshPublicPages();
+  revalidatePath("/admin");
   redirect("/admin");
 }
 
@@ -72,6 +76,7 @@ export async function updateResource(id: number, formData: FormData) {
   const categoryId = Number(formData.get("categoryId"));
   const deadlineRaw = String(formData.get("deadline") ?? "");
   const urlRaw = String(formData.get("url") ?? "");
+  const shouldApprove = formData.get("approve") === "true";
 
   await db
     .update(schema.resources)
@@ -105,11 +110,13 @@ export async function updateResource(id: number, formData: FormData) {
         | null,
       deadline: deadlineRaw ? new Date(deadlineRaw) : null,
       status: formData.get("status") as (typeof schema.resources.$inferInsert)["status"],
+      ...(shouldApprove ? { approved: true } : {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.resources.id, id));
 
   refreshPublicPages();
+  revalidatePath("/admin");
   redirect("/admin");
 }
 
@@ -125,12 +132,32 @@ export async function updateStatus(id: number, formData: FormData) {
     .where(eq(schema.resources.id, id));
 
   refreshPublicPages();
+  revalidatePath("/admin");
+}
+
+export async function updateResourceStatus(
+  id: number,
+  status: "active" | "expired" | "broken",
+) {
+  await verifyAdmin();
+
+  await db
+    .update(schema.resources)
+    .set({
+      status,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.resources.id, id));
+
+  refreshPublicPages();
+  revalidatePath("/admin");
 }
 
 export async function deleteResource(id: number) {
   await verifyAdmin();
   await db.delete(schema.resources).where(eq(schema.resources.id, id));
   refreshPublicPages();
+  revalidatePath("/admin");
 }
 
 // Both only touch unapproved rows, so a stale review form can never unpublish
@@ -151,4 +178,10 @@ export async function rejectSubmission(id: number) {
     .delete(schema.resources)
     .where(and(eq(schema.resources.id, id), eq(schema.resources.approved, false)));
   revalidatePath("/admin");
+}
+
+export async function signOutAdmin() {
+  const supabase = await createServerSupabaseClient();
+  await supabase.auth.signOut();
+  redirect("/admin/login");
 }

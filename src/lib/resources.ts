@@ -269,6 +269,27 @@ export async function getResourceById(id: number): Promise<Resource | null> {
   }
 }
 
+// Admin-only: fetches only the requested resource IDs (e.g. matched duplicate
+// resources on /admin/ingestion) instead of loading the entire table.
+export async function getResourcesByIds(ids: number[]): Promise<Resource[]> {
+  const uniqueIds = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  if (uniqueIds.length === 0) return [];
+  if (!hasDatabase()) {
+    return MOCK_RESOURCES.filter((r) => uniqueIds.includes(r.id));
+  }
+  try {
+    const rows = await db
+      .select(resourceColumns)
+      .from(resources)
+      .innerJoin(categories, eq(resources.categoryId, categories.id))
+      .where(inArray(resources.id, uniqueIds));
+    return rows.map(toResource);
+  } catch (error) {
+    console.warn("[StudentStack DB] getResourcesByIds query failed:", error instanceof Error ? error.message : error);
+    return MOCK_RESOURCES.filter((r) => uniqueIds.includes(r.id));
+  }
+}
+
 export async function getCategories(): Promise<Category[]> {
   if (!hasDatabase()) return MOCK_CATEGORIES;
   try {
@@ -479,23 +500,42 @@ export type PendingSubmission = {
 };
 
 export async function getPendingSubmissions(): Promise<PendingSubmission[]> {
-  return db
-    .select({
-      id: resources.id,
-      name: resources.name,
-      url: resources.url,
-      tagline: resources.tagline,
-      description: resources.description,
-      costType: resources.costType,
-      region: resources.region,
-      categoryName: categories.name,
-      submittedBy: resources.submittedBy,
-      createdAt: resources.createdAt,
-    })
-    .from(resources)
-    .innerJoin(categories, eq(resources.categoryId, categories.id))
-    .where(eq(resources.approved, false))
-    .orderBy(desc(resources.createdAt));
+  if (!hasDatabase()) return [];
+  try {
+    return await db
+      .select({
+        id: resources.id,
+        name: resources.name,
+        url: resources.url,
+        tagline: resources.tagline,
+        description: resources.description,
+        costType: resources.costType,
+        region: resources.region,
+        categoryName: categories.name,
+        submittedBy: resources.submittedBy,
+        createdAt: resources.createdAt,
+      })
+      .from(resources)
+      .innerJoin(categories, eq(resources.categoryId, categories.id))
+      .where(eq(resources.approved, false))
+      .orderBy(desc(resources.createdAt));
+  } catch (error) {
+    console.warn("[StudentStack DB] getPendingSubmissions query failed:", error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
+export async function getPendingSubmissionsCount(): Promise<number> {
+  if (!hasDatabase()) return 0;
+  try {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(resources)
+      .where(eq(resources.approved, false));
+    return Number(row?.count ?? 0);
+  } catch {
+    return 0;
+  }
 }
 
 export type UserSubmission = {
