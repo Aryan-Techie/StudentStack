@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import styles from "@/components/home/brand.module.css";
 import { SiteFooter, SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
@@ -85,6 +86,12 @@ export default async function MyListPage({
           </form>
         </div>
         <h1 className={styles.pageTitle}>My list</h1>
+        <p className={styles.hint}>
+          <Link href="/onboarding?next=/my-list" className="underline">
+            Set your branch and year
+          </Link>{" "}
+          to get a “For you” sort in the directory.
+        </p>
         {nextPath !== "/my-list" && <PendingSave resourceId={pendingSave} />}
         <MyListClient
           items={saved.map((item) => ({
