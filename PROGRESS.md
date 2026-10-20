@@ -240,6 +240,39 @@ private calendar feed of their saved deadlines.
 4. **Free-text fields are normalized.** Admins type eligibility fields as
    "CS", "Computer Science", "ECE"…; profiles use the #34 branch codes.
    Both sides map to a shared canonical code before comparing.
+## Issue #37 — Student reviews and ratings
+
+PRD §8.11 on top of the existing `reviews` table.
+
+- **Schema** (`drizzle/0004_reviews_unique.sql`): unique index on
+  `(resource_id, user_id)` so each student has one review per resource and
+  writes are an upsert; `verified_student` boolean (set when the author's
+  sign-in email is academic: `.edu`, `.edu.xx`, `.ac.xx`, `.ernet.in`);
+  `updated_at`.
+- **Writing.** `submitReview` / `deleteMyReview` Server Actions in
+  `src/app/reviews/actions.ts` check the Supabase session, validate input
+  (integer 1–5, comment up to 1000 characters, `src/lib/review-rules.ts`),
+  and only touch the caller's own row. The form on `/r/[slug]` loads the
+  student's own review from `GET /api/reviews?resourceId=`
+  (`private, no-store`). Signed-out visitors get a sign-in-and-save link.
+- **Reading.** `/r/[slug]` shows the aggregate ("4.2 ★ (23 reviews)") and up
+  to 50 reviews, sortable by most recent or highest rated (`?reviews=highest`).
+  Directory cards show average stars and count via one `GROUP BY` per
+  render. JSON-LD `Product` gains `aggregateRating` when reviews exist.
+
+### Judgment calls (#37)
+
+- **Only students who saved the resource (#33) can review it.** It's the
+  closest signal we have that they used it. An existing review stays
+  editable if the bookmark is later removed.
+- **Authors are shown only as "Student".** No names, emails, or ids leave
+  the server.
+- **RLS rules live in the Server Actions.** The app connects as the table
+  owner, so public-read / author-only-write is enforced in code. RLS stays
+  enabled with no policies, so the Data API with the publishable key still
+  can't reach the table.
+- **No "most helpful" sort.** It needs a helpfulness-vote table; left as a
+  follow-up to keep the change focused.
 
 ## Status: Phase 2 (PRD §13) — done
 
