@@ -64,7 +64,7 @@ offers.json → scripts/normalize-data.ts → scripts/seed.ts → Supabase Postg
 | **Frontend/Backend** | [Next.js](https://nextjs.org/) 16 (App Router, Turbopack), [React](https://react.dev/) 19, TypeScript |
 | **Styling** | [Tailwind CSS](https://tailwindcss.com/) 4 (CSS-first `@theme`), Radix primitives, shadcn-style UI components |
 | **Database** | Postgres via your own [Supabase](https://supabase.com/) project, queried with [Drizzle ORM](https://orm.drizzle.team/) |
-| **Auth** | Supabase Auth, gating `/admin` behind a single allow-listed email (`ADMIN_EMAIL`) |
+| **Auth** | Supabase Auth, gating `/admin` behind the `ADMIN_EMAIL` allow-list or an `admin` role on the user's profile |
 | **Scheduled Jobs** | [Vercel Cron](https://vercel.com/docs/cron-jobs) triggers `/api/cron/link-health` every Monday 03:00 UTC |
 | **Email** | [Resend](https://resend.com/) HTTP API sends the weekly digest from `/api/cron/weekly-digest` every Friday 03:30 UTC |
 | **Ingestion** | Vercel Cron triggers `/api/cron/ingest-resources` every Monday and Thursday 04:00 UTC |
@@ -167,7 +167,7 @@ POSTGRES_URL_NON_POOLING=  # Supavisor pooler, Session mode (port 5432) — driz
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY= # server-only, used by scripts/create-admin.ts
-ADMIN_EMAIL=               # the one account allowed into /admin
+ADMIN_EMAIL=               # account(s) allowed into /admin, comma-separated
 CRON_SECRET=               # Vercel Cron sends this as a Bearer token
 SUBMISSIONS_WEBHOOK_URL=   # optional: Slack/JSON webhook pinged on each new /submit entry; falls back to LINK_HEALTH_WEBHOOK_URL
 RESEND_API_KEY=            # optional: Resend API key for the weekly digest (set by the Vercel Resend integration)
@@ -194,7 +194,7 @@ pnpm db:seed
 pnpm dotenv -e .env.local -- tsx scripts/create-admin.ts you@example.com <password>
 ```
 
-The email must match `ADMIN_EMAIL`.
+The email must be listed in `ADMIN_EMAIL`. To give an existing account admin access without changing env vars, run `pnpm dotenv -e .env.local -- tsx scripts/grant-admin.ts <email>` (add `--revoke` to remove it); the person needs to have signed in once.
 
 ### 5. Run the App
 
@@ -229,7 +229,7 @@ To weigh similar offers against each other, open **Compare** in the header (or *
 
 ## Admin Dashboard
 
-`/admin` is a minimal dashboard for managing resources without direct database access — create, edit, flip status (`active`/`expired`/`broken`), and delete. It's gated by Supabase Auth to a single allow-listed email (`ADMIN_EMAIL`); every Server Action re-verifies that check independently of the proxy-level redirect, since Next.js middleware alone isn't a sufficient security boundary.
+`/admin` is a minimal dashboard for managing resources without direct database access — create, edit, flip status (`active`/`expired`/`broken`), and delete. It's gated by Supabase Auth to accounts listed in `ADMIN_EMAIL` (comma-separated) or whose profile has the `admin` role (see `scripts/grant-admin.ts`); every Server Action re-verifies that check independently of the proxy-level redirect, since Next.js middleware alone isn't a sufficient security boundary.
 
 The create/edit form also covers the opportunity fields: kind, opens-at and deadline dates, recurrence (e.g. "annual, opens Feb"), amount, provider, and an eligibility fieldset (study levels, countries, states, fields of study, minimum year, maximum age, gender, income cap in INR). Leave a field empty when the opportunity is open on that axis. Creating a resource from an ingestion candidate pre-fills these fields from the candidate.
 
@@ -360,7 +360,7 @@ Any platform that supports Node.js 20+ and can run `pnpm build && pnpm start` wi
 
 ## Current Scope
 
-The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`, and student reviews and ratings (issue #37) on resource pages and directory cards. Click events are recorded but only surface as the homepage's "Popular this week". Multi-admin roles remain out of scope for now.
+The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`, and student reviews and ratings (issue #37) on resource pages and directory cards. Click events are recorded but only surface as the homepage's "Popular this week".
 
 ---
 

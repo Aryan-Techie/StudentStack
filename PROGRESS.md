@@ -3,6 +3,34 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #42 — Phase 3 wrap-up: admin roles and RLS
+
+Phase 3's features are #33 (bookmarks), #34 (personalization), #84
+(eligibility + per-user calendar), and #32 (deadlines, already merged). This
+closes the epic's cross-cutting items:
+
+- **Role-based admin.** `verifyAdmin()` used to check that the signed-in email
+  equals `ADMIN_EMAIL`. Now an account is an admin when its email is in
+  `ADMIN_EMAIL`, which accepts a comma-separated list (a single address still
+  works, so nothing changes for existing deployments), or when its
+  `profiles.role` is `admin`. Judgment call: the env var stays as the
+  bootstrap path because it works before any profile row exists, and roles
+  are granted from the CLI (`scripts/grant-admin.ts`) rather than from an
+  admin UI, so an attacker who gets into one admin account can't promote
+  others. The role lookup only runs when the email isn't allow-listed, and a
+  database error fails closed.
+- **RLS.** `ingestion_candidates` never had `.enableRLS()`, so the table was
+  readable and writable through Supabase's Data API with the public key.
+  It's enabled now (`drizzle/0008_admin_role_and_rls.sql`), and
+  `src/db/schema-rls.test.ts` fails if any future table forgets it. The app
+  still connects as the table owner, which bypasses RLS, so no policies are
+  needed. The per-user rules RLS policies would express (only your own
+  bookmarks, reviews, and profile) are enforced in the Server Actions, which
+  only ever use the user id from the verified session.
+- **Auth protection** for `/my-list` and `/onboarding` landed with #33 and #34
+  (`proxy.ts` matcher plus a session check in each page), and the `profiles`
+  migration landed with #34.
+
 ## Issue #79 — Opportunity content: student_resources.json and flagship programs
 
 - **student_resources.json is not committed**, same as `offers.json`: it's a
