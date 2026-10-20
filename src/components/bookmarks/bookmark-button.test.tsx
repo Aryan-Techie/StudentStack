@@ -48,10 +48,10 @@ describe("BookmarkButton", () => {
     saveBookmark.mockResolvedValue({ ok: true });
     renderButton();
     const button = await screen.findByRole("button", { name: "Save Figma" });
-    await waitFor(() => expect(button).not.toBeDisabled());
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(button);
     expect(saveBookmark).toHaveBeenCalledWith(7, "interested");
-    expect(await screen.findByRole("button", { name: /saved as Interested/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /saved as Interested/ })).toBeTruthy();
   });
 
   it("rolls back when the save fails", async () => {
@@ -59,14 +59,14 @@ describe("BookmarkButton", () => {
     saveBookmark.mockResolvedValue({ ok: false, reason: "failed" });
     renderButton();
     const button = await screen.findByRole("button", { name: "Save Figma" });
-    await waitFor(() => expect(button).not.toBeDisabled());
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(button);
-    expect(await screen.findByRole("button", { name: "Save Figma" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Save Figma" })).toBeTruthy();
   });
 
   it("shows the saved status from the API", async () => {
     mockBookmarksApi({ signedIn: true, bookmarks: { 7: "applied" } });
     renderButton();
-    expect(await screen.findByRole("button", { name: /saved as Applied/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /saved as Applied/ })).toBeTruthy();
   });
 });
