@@ -1,5 +1,6 @@
 /**
- * Admin notifications for the weekly link-health cron (issue #41).
+ * Admin notifications: the weekly link-health cron (issue #41) and new
+ * community submissions (issue #35).
  *
  * PRD §8.6 requires the admin to get a summary notification when the cron
  * finds broken links. Until the Phase 5 email infrastructure exists, this
@@ -56,11 +57,34 @@ export function buildBrokenLinksMessage(
   ].join("\n");
 }
 
-/**
- * POSTs the broken-links summary to the configured webhook. Never throws:
- * a missing webhook, an HTTP error, or a network failure is reported in
- * the result so the cron can log it and finish normally.
- */
+// Shared webhook POST. Never throws: a missing webhook, an HTTP error, or a
+// network failure is reported in the result so callers can log it and
+// carry on.
+async function postWebhook(
+  text: string,
+  webhookUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<NotifyResult> {
+  try {
+    const res = await fetchImpl(webhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      return { sent: false, reason: `webhook returned HTTP ${res.status}` };
+    }
+    return { sent: true };
+  } catch (err) {
+    return {
+      sent: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/** POSTs the broken-links summary to the configured webhook. Never throws. */
 export async function notifyBrokenLinks(
   links: BrokenLink[],
   summary: LinkHealthSummary,
@@ -77,22 +101,61 @@ export async function notifyBrokenLinks(
   if (!webhookUrl) {
     return { sent: false, reason: "LINK_HEALTH_WEBHOOK_URL is not configured" };
   }
-  const fetchImpl = options.fetchImpl ?? fetch;
-  try {
-    const res = await fetchImpl(webhookUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: buildBrokenLinksMessage(links, summary) }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) {
-      return { sent: false, reason: `webhook returned HTTP ${res.status}` };
-    }
-    return { sent: true };
-  } catch (err) {
-    return {
-      sent: false,
-      reason: err instanceof Error ? err.message : String(err),
-    };
+  return postWebhook(
+    buildBrokenLinksMessage(links, summary),
+    webhookUrl,
+    options.fetchImpl ?? fetch,
+  );
+}
+
+/**
+ * New community submissions (issue #35). Uses SUBMISSIONS_WEBHOOK_URL,
+ * falling back to LINK_HEALTH_WEBHOOK_URL so one Slack channel can take
+ * both. Unset = no notification; the admin queue still shows the row.
+ */
+export type NewSubmission = {
+  name: string;
+  url: string;
+  categoryName?: string;
+};
+
+export function getSubmissionsWebhookUrl(
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const url = env.SUBMISSIONS_WEBHOOK_URL?.trim();
+  return url ? url : getWebhookUrl(env);
+}
+
+export function buildNewSubmissionMessage(
+  submission: NewSubmission,
+  adminUrl: string,
+): string {
+  const category = submission.categoryName ? ` (${submission.categoryName})` : "";
+  return [
+    `New community submission waiting for review: ${submission.name}${category}`,
+    submission.url,
+    `Review it at ${adminUrl}`,
+  ].join("\n");
+}
+
+export async function notifyNewSubmission(
+  submission: NewSubmission,
+  adminUrl: string,
+  options: {
+    webhookUrl?: string | null;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<NotifyResult> {
+  const webhookUrl =
+    options.webhookUrl !== undefined
+      ? options.webhookUrl
+      : getSubmissionsWebhookUrl();
+  if (!webhookUrl) {
+    return { sent: false, reason: "SUBMISSIONS_WEBHOOK_URL is not configured" };
   }
+  return postWebhook(
+    buildNewSubmissionMessage(submission, adminUrl),
+    webhookUrl,
+    options.fetchImpl ?? fetch,
+  );
 }
