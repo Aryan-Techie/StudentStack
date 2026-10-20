@@ -50,6 +50,12 @@ Run `pnpm db:push` to apply the schema to your development database, then
 ask a maintainer how to obtain the input and place it at the repository root before
 running `pnpm db:seed`.
 
+`student_resources.json` is optional and also ignored by Git. When it's present at the
+repository root, `pnpm db:seed` adds its net-new rows. The curated flagship
+opportunities in `src/lib/flagship-opportunities.ts` are always seeded. If you update a
+program's dates there, use only dates from the program's official page and update its
+`source` and `verifiedOn` fields.
+
 **Seeding deletes and reloads the resources and categories tables. Only run it
 against a disposable development database, not a shared or production database.**
 

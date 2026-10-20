@@ -3,6 +3,40 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #79 — Opportunity content: student_resources.json and flagship programs
+
+- **student_resources.json is not committed**, same as `offers.json`: it's a
+  third-party export, so the seed uses it when present. Its rows are matched
+  against `offers.json` on the product name with deal words stripped
+  ("Cursor Pro Student" = "Cursor"; perks only, since for scholarships those
+  words are part of the name) or on the claim link's host + path. Host alone
+  was too loose (google.com hosts many unrelated offers). Job boards and loan
+  marketplaces (Internshala, LetsIntern, Naukri, StuCred, …) are dropped as
+  out of scope. Result against the current `offers.json`: 100 net-new and 45
+  duplicates. The issue estimated 91 against an older snapshot.
+- **The curated file is the reviewed source of truth for dates.** Each of
+  the 59 programs was checked on its official site on 2026-10-21. 31 have a
+  verified deadline (14 upcoming, 17 from a cycle within the last 12 months,
+  so /deadlines can show "Opens again ~<month>"). Older past dates (Khorana
+  2024, Fulbright-Nehru 2025) were left out rather than shown as recent. The
+  other 28 have no dates because no official date was published; 7 of them
+  are mentorship programs, which don't have deadlines. Dropped: Microsoft
+  Engage and Google STEP (no longer running), DST WOS-A (no current call),
+  and paid mentorship marketplaces (Preplaced, Topmate, MentorCruise,
+  Codementor), because no cost type fits a paid service.
+- **Dates are stored at 12:00 UTC**, not end of day. End-of-day UTC is
+  05:29 IST the next morning, so Indian students would have seen a deadline
+  one day late (a passed deadline showed as "today"). Noon UTC keeps the
+  calendar date correct from UTC-11 to UTC+11, and errs early rather than
+  late.
+- **Seed conflict policy**: a non-NULL curated date overwrites the stored
+  one, so a new cycle lands on re-seed. A NULL never wipes a date an admin
+  entered. Kind, amount, provider, recurrence, and eligibility only backfill
+  when NULL (or `perk`), like the other admin-editable fields.
+- A curated program updates every row that matches it, because some schemes
+  are listed under more than one name (the UGC PG scholarship absorbed the
+  Single Girl Child scholarship).
+
 ## Issue #78 — Opportunity fields on resources
 
 Scholarships, fellowships, internships, mentorships, and programs now fit
