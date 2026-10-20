@@ -283,9 +283,7 @@ Any platform that supports Node.js 20+ and can run `pnpm build && pnpm start` wi
 
 ## Current Scope
 
-The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`. The schema already includes tables for reviews and click events, but those flows aren't exposed in the UI yet — they're planned for a future phase that extends the existing Supabase Auth setup to real user accounts. Multi-admin roles remain out of scope for now.
-
-Student reviews and ratings (issue #37) are now exposed on resource pages and directory cards.
+The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`, and student reviews and ratings (issue #37) on resource pages and directory cards. Click events are recorded but only surface as the homepage's "Popular this week". Multi-admin roles remain out of scope for now.
 
 ---
 
