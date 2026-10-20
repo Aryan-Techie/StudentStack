@@ -133,7 +133,7 @@ function rssDate(ms: number): string {
 // Upcoming deadlines only (past ones are noise in a reader), soonest first.
 export function buildRssFeed(
   resources: Resource[],
-  opts: { origin?: string; nowMs?: number; calendarName?: string } = {},
+  opts: { origin?: string; nowMs?: number } = {},
 ): string {
   const origin = opts.origin ?? siteUrl();
   const nowMs = opts.nowMs ?? Date.now();

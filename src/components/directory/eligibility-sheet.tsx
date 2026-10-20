@@ -98,9 +98,10 @@ function EligibilityForm({
         onDone();
       }}
     >
-      <label className={fieldClass}>
-        Country
+      <div className={fieldClass}>
+        <label htmlFor="eligibility-country">Country</label>
         <select
+          id="eligibility-country"
           name="country"
           defaultValue={current.country}
           onChange={(e) => setCountry(e.target.value)}
@@ -112,16 +113,16 @@ function EligibilityForm({
             </option>
           ))}
         </select>
-      </label>
+      </div>
       {country === "IN" && (
-        <label className={fieldClass}>
-          State
-          <input name="state" defaultValue={current.state ?? ""} placeholder="e.g. Kerala" className={inputClass} />
-        </label>
+        <div className={fieldClass}>
+          <label htmlFor="eligibility-state">State</label>
+          <input id="eligibility-state" name="state" defaultValue={current.state ?? ""} placeholder="e.g. Kerala" className={inputClass} />
+        </div>
       )}
-      <label className={fieldClass}>
-        Degree level
-        <select name="level" defaultValue={current.level ?? ""} className={inputClass}>
+      <div className={fieldClass}>
+        <label htmlFor="eligibility-level">Degree level</label>
+        <select id="eligibility-level" name="level" defaultValue={current.level ?? ""} className={inputClass}>
           <option value="">Prefer not to say</option>
           {ELIGIBILITY_LEVEL_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>
@@ -129,10 +130,10 @@ function EligibilityForm({
             </option>
           ))}
         </select>
-      </label>
-      <label className={fieldClass}>
-        Year of study
-        <select name="year" defaultValue={current.year ?? ""} className={inputClass}>
+      </div>
+      <div className={fieldClass}>
+        <label htmlFor="eligibility-year">Year of study</label>
+        <select id="eligibility-year" name="year" defaultValue={current.year ?? ""} className={inputClass}>
           <option value="">Prefer not to say</option>
           {YEARS.map((y) => (
             <option key={y} value={y}>
@@ -140,10 +141,10 @@ function EligibilityForm({
             </option>
           ))}
         </select>
-      </label>
-      <label className={fieldClass}>
-        Branch / field
-        <select name="field" defaultValue={current.field ?? ""} className={inputClass}>
+      </div>
+      <div className={fieldClass}>
+        <label htmlFor="eligibility-field">Branch / field</label>
+        <select id="eligibility-field" name="field" defaultValue={current.field ?? ""} className={inputClass}>
           <option value="">Prefer not to say</option>
           {BRANCHES.map(([value, label]) => (
             <option key={value} value={value}>
@@ -151,7 +152,7 @@ function EligibilityForm({
             </option>
           ))}
         </select>
-      </label>
+      </div>
       <fieldset className="flex flex-col gap-2 text-sm">
         <legend className="mb-1">I have</legend>
         <label className="flex items-center gap-2">
