@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
 import { verifyAdmin } from "@/lib/admin/auth";
 import { markCandidateReviewed } from "@/lib/ingestion/queries";
+import { parseOpportunityFields } from "@/lib/admin/opportunity-fields";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function parseTags(raw: FormDataEntryValue | null): string[] {
@@ -24,7 +25,6 @@ export async function createResource(formData: FormData) {
   await verifyAdmin();
 
   const categoryId = Number(formData.get("categoryId"));
-  const deadlineRaw = String(formData.get("deadline") ?? "");
 
   await db.insert(schema.resources).values({
     slug: String(formData.get("name")).toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -55,7 +55,7 @@ export async function createResource(formData: FormData) {
       | "while_student"
       | "lifetime"
       | null,
-    deadline: deadlineRaw ? new Date(deadlineRaw) : null,
+    ...parseOpportunityFields(formData),
     status: "active",
   });
 
@@ -74,7 +74,6 @@ export async function updateResource(id: number, formData: FormData) {
   await verifyAdmin();
 
   const categoryId = Number(formData.get("categoryId"));
-  const deadlineRaw = String(formData.get("deadline") ?? "");
   const urlRaw = String(formData.get("url") ?? "");
   const shouldApprove = formData.get("approve") === "true";
 
@@ -108,7 +107,7 @@ export async function updateResource(id: number, formData: FormData) {
         | "while_student"
         | "lifetime"
         | null,
-      deadline: deadlineRaw ? new Date(deadlineRaw) : null,
+      ...parseOpportunityFields(formData),
       status: formData.get("status") as (typeof schema.resources.$inferInsert)["status"],
       ...(shouldApprove ? { approved: true } : {}),
       updatedAt: new Date(),

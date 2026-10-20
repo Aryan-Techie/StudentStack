@@ -22,6 +22,11 @@ export default async function NewResourcePage({
         costType: candidate.costType ?? undefined,
         region: candidate.region ?? undefined,
         tags: candidate.tags,
+        kind: candidate.kind ?? undefined,
+        deadline: candidate.deadline?.getTime() ?? null,
+        opensAt: candidate.opensAt?.getTime() ?? null,
+        amount: candidate.amount,
+        provider: candidate.provider,
       }
     : undefined;
 

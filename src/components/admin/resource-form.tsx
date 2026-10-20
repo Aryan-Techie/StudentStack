@@ -1,4 +1,6 @@
 import type { Category, Resource } from "@/lib/resources";
+import { RESOURCE_KIND_VALUES } from "@/db/schema";
+import { ELIGIBILITY_LEVELS, toDateInputValue } from "@/lib/admin/opportunity-fields";
 
 const COST_TYPES = ["free", "discount", "stipend", "scholarship", "credits", "trial"] as const;
 const STATUS_OPTIONS = ["active", "expired", "broken"] as const;
@@ -33,6 +35,11 @@ export function ResourceForm({
     costType?: string;
     region?: "IN" | "Global";
     tags?: string[];
+    kind?: Resource["kind"];
+    deadline?: number | null;
+    opensAt?: number | null;
+    amount?: string | null;
+    provider?: string | null;
   };
   candidateId?: number;
   action: (formData: FormData) => void;
@@ -84,6 +91,16 @@ export function ResourceForm({
           {COST_TYPES.map((c) => (
             <option key={c} value={c}>
               {c}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Kind
+        <select name="kind" defaultValue={resource?.kind ?? defaults?.kind ?? "perk"} className="border-line rounded border px-3 py-2">
+          {RESOURCE_KIND_VALUES.map((k) => (
+            <option key={k} value={k}>
+              {k}
             </option>
           ))}
         </select>
@@ -148,9 +165,130 @@ export function ResourceForm({
         <input name="tags" defaultValue={resource?.tags.join(", ") ?? defaults?.tags?.join(", ")} className="border-line rounded border px-3 py-2" />
       </label>
       <label className="flex flex-col gap-1 text-sm">
-        Deadline
-        <input name="deadline" type="date" className="border-line rounded border px-3 py-2" />
+        Opens at
+        <input
+          name="opensAt"
+          type="date"
+          defaultValue={toDateInputValue(resource?.opensAt ?? defaults?.opensAt)}
+          className="border-line rounded border px-3 py-2"
+        />
       </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Deadline
+        <input
+          name="deadline"
+          type="date"
+          defaultValue={toDateInputValue(resource?.deadline ?? defaults?.deadline)}
+          className="border-line rounded border px-3 py-2"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Recurrence
+        <input
+          name="recurrence"
+          placeholder="annual, opens Feb"
+          defaultValue={resource?.recurrence ?? ""}
+          className="border-line rounded border px-3 py-2"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Amount
+        <input
+          name="amount"
+          placeholder="₹31,000/month"
+          defaultValue={resource?.amount ?? defaults?.amount ?? ""}
+          className="border-line rounded border px-3 py-2"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Provider
+        <input
+          name="provider"
+          placeholder="Google, AICTE"
+          defaultValue={resource?.provider ?? defaults?.provider ?? ""}
+          className="border-line rounded border px-3 py-2"
+        />
+      </label>
+      <fieldset className="border-line flex flex-col gap-3 rounded border px-3 py-3 text-sm">
+        <legend className="px-1">Eligibility (leave blank for open)</legend>
+        <div className="flex flex-wrap gap-3">
+          {ELIGIBILITY_LEVELS.map((level) => (
+            <label key={level} className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                name="eligibilityLevels"
+                value={level}
+                defaultChecked={resource?.eligibility?.levels?.includes(level)}
+              />
+              {level}
+            </label>
+          ))}
+        </div>
+        <label className="flex flex-col gap-1">
+          Countries (ISO codes, comma-separated)
+          <input
+            name="eligibilityCountries"
+            placeholder="IN"
+            defaultValue={resource?.eligibility?.countries?.join(", ") ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          States (comma-separated)
+          <input
+            name="eligibilityStates"
+            defaultValue={resource?.eligibility?.states?.join(", ") ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          Fields (comma-separated)
+          <input
+            name="eligibilityFields"
+            placeholder="CS, ECE"
+            defaultValue={resource?.eligibility?.fields?.join(", ") ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          Minimum year of study
+          <input
+            name="eligibilityMinYear"
+            type="number"
+            min={1}
+            defaultValue={resource?.eligibility?.minYear ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          Maximum age
+          <input
+            name="eligibilityMaxAge"
+            type="number"
+            min={1}
+            defaultValue={resource?.eligibility?.maxAge ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          Gender
+          <input
+            name="eligibilityGender"
+            defaultValue={resource?.eligibility?.gender ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          Family income cap (INR/year)
+          <input
+            name="eligibilityIncomeCapInr"
+            type="number"
+            min={1}
+            defaultValue={resource?.eligibility?.incomeCapInr ?? ""}
+            className="border-line rounded border px-3 py-2"
+          />
+        </label>
+      </fieldset>
       {resource && (
         <label className="flex flex-col gap-1 text-sm">
           Status
