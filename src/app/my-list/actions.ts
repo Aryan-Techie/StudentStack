@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { deleteBookmark, isApprovedResource, upsertBookmark } from "@/lib/bookmarks";
 import { isBookmarkStatus, type BookmarkStatus } from "@/lib/bookmark-status";
+import { getOrCreateCalendarToken, rotateCalendarToken } from "@/lib/profiles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type BookmarkActionResult = { ok: true } | { ok: false; reason: "signed_out" | "invalid" | "failed" };
@@ -48,4 +49,20 @@ export async function removeBookmark(resourceId: number): Promise<BookmarkAction
   }
   revalidatePath("/my-list");
   return { ok: true };
+}
+
+// Per-user deadlines feed (issue #84). Form actions: /my-list re-renders
+// with the subscribe URL afterwards.
+export async function enableCalendarFeed(): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+  await getOrCreateCalendarToken(userId);
+  revalidatePath("/my-list");
+}
+
+export async function resetCalendarFeed(): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+  await rotateCalendarToken(userId);
+  revalidatePath("/my-list");
 }

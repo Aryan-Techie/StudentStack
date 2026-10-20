@@ -266,6 +266,21 @@ export async function getResourcesForSlugs(slugs: string[]): Promise<Resource[]>
   }
 }
 
+// Per-user deadlines feed (issue #84): the student's bookmarked, approved
+// resources that carry a deadline.
+export async function getBookmarkedDeadlines(userId: string): Promise<Resource[]> {
+  if (!hasDatabase()) return [];
+  const bookmarks = schema.bookmarks;
+  const rows = await db
+    .select(resourceColumns)
+    .from(bookmarks)
+    .innerJoin(resources, eq(bookmarks.resourceId, resources.id))
+    .innerJoin(categories, eq(resources.categoryId, categories.id))
+    .where(and(eq(bookmarks.userId, userId), eq(resources.approved, true), isNotNull(resources.deadline)))
+    .orderBy(resources.deadline);
+  return rows.map(toResource);
+}
+
 // Sitemap: every approved resource slug plus its last update, so
 // /sitemap.xml can list all per-resource pages with fresh lastModified dates.
 export async function getAllResourceSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {

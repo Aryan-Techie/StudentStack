@@ -190,6 +190,44 @@
 }
 
 /* ---------- Kind filter chips (issue #81) ---------- */
+.eligibilityBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  color: var(--d-ink-secondary);
+}
+
+.eligibilityToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--d-ink);
+  cursor: pointer;
+}
+
+.eligibilityToggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--d-purple);
+}
+
+.eligibilityEdit {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--d-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.eligibilityEdit:hover {
+  color: var(--d-ink);
+}
+
 .kindBar {
   display: flex;
   flex-wrap: wrap;

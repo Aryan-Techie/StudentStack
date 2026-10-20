@@ -4,8 +4,11 @@ import styles from "@/components/home/brand.module.css";
 import { SiteFooter, SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
 import { getSavedResources } from "@/lib/bookmarks";
+import { getProfile } from "@/lib/profiles";
+import { getSiteUrl } from "@/lib/site";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { signOut } from "../submit/actions";
+import { enableCalendarFeed, resetCalendarFeed } from "./actions";
 import { SignInPanel } from "../submit/sign-in-panel";
 import { MyListClient } from "./my-list-client";
 import { PendingSave } from "./pending-save";
@@ -68,7 +71,8 @@ export default async function MyListPage({
     );
   }
 
-  const saved = await getSavedResources(user.id);
+  const [saved, profile] = await Promise.all([getSavedResources(user.id), getProfile(user.id)]);
+  const feedUrl = profile?.calendarToken ? `${getSiteUrl()}/u/${profile.calendarToken}/deadlines.ics` : null;
 
   return (
     <div className={`${passFontVariables} ${styles.root}`}>
@@ -100,6 +104,41 @@ export default async function MyListPage({
             savedAt: item.savedAt.getTime(),
           }))}
         />
+        <section aria-labelledby="calendar-heading" className="pb-16">
+          <h2 id="calendar-heading" className={styles.sectionTitle}>
+            Deadlines in your calendar
+          </h2>
+          <p className={styles.hint}>
+            Subscribe once and every saved offer with a deadline shows up in Google Calendar, Apple Calendar, or
+            Outlook. Keep the link private: anyone with it can see your saved deadlines.
+          </p>
+          {feedUrl ? (
+            <div className="mt-3 flex flex-col gap-2">
+              <input
+                readOnly
+                value={feedUrl}
+                aria-label="Your calendar feed URL"
+                className="w-full rounded border border-border px-3 py-2 font-mono text-xs"
+              />
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <a href={feedUrl.replace(/^https?:/, "webcal:")} className="font-medium underline">
+                  Subscribe
+                </a>
+                <form action={resetCalendarFeed}>
+                  <button type="submit" className={styles.linkButton}>
+                    Reset link
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <form action={enableCalendarFeed} className="mt-3">
+              <button type="submit" className={styles.cta}>
+                Get my calendar link
+              </button>
+            </form>
+          )}
+        </section>
       </main>
       <SiteFooter />
     </div>

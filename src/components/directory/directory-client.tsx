@@ -14,7 +14,9 @@ import { ShortcutsHelp } from "./shortcuts-help";
 import { FilterAnnouncer } from "./filter-announcer";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { hasSignals, sortForYou } from "@/lib/personalization";
-import { useProfileSignals } from "./use-profile-signals";
+import { useViewerProfile } from "./use-viewer-profile";
+import { EligibilitySheet } from "./eligibility-sheet";
+import { isEligible } from "@/lib/eligibility";
 import styles from "./directory.module.css";
 
 type SortMode = "for-you" | "recommended" | "name" | "recent" | "free-first";
@@ -88,7 +90,7 @@ function readStoredFilters(): Partial<DirectoryFilters> {
 }
 
 export function DirectoryClient({
-  resources,
+  resources: allResources,
   categories,
   allTags,
   initialFilters,
@@ -100,6 +102,14 @@ export function DirectoryClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Eligibility profile + "Only what I'm eligible for" (issue #84). The
+  // toggle narrows the pool every filter, facet count, and search runs on.
+  const { signals: profile, eligibility, saveEligibility, eligibleOnly, setEligibleOnly } = useViewerProfile();
+  const [eligibilityOpen, setEligibilityOpen] = useState(false);
+  const resources = useMemo(
+    () => (eligibleOnly && eligibility ? allResources.filter((r) => isEligible(r, eligibility)) : allResources),
+    [allResources, eligibleOnly, eligibility],
+  );
 
   // Deliberately NOT reading localStorage here. This component is
   // server-rendered for the initial HTML, and `localStorage` doesn't exist
@@ -154,7 +164,6 @@ const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 // null = not chosen yet: "For you" when the student has a branch/year
 // profile (issue #34), otherwise "Recommended".
 const [sortChoice, setSortChoice] = useState<SortMode | null>(null);
-const profile = useProfileSignals();
 const sort: SortMode = sortChoice ?? (hasSignals(profile) ? "for-you" : "recommended");
 const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -718,6 +727,32 @@ useKeyboardShortcuts({
       </aside>
 
       <div style={{ minWidth: 0 }}>
+        <div className={styles.eligibilityBar}>
+          <label className={styles.eligibilityToggle}>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={eligibleOnly && Boolean(eligibility)}
+              onChange={(e) => {
+                if (e.target.checked && !eligibility) setEligibilityOpen(true);
+                else setEligibleOnly(e.target.checked);
+              }}
+            />
+            Only what I’m eligible for
+          </label>
+          <button type="button" className={styles.eligibilityEdit} onClick={() => setEligibilityOpen(true)}>
+            {eligibility ? "Edit my eligibility" : "Set my eligibility"}
+          </button>
+        </div>
+        <EligibilitySheet
+          open={eligibilityOpen}
+          onOpenChange={setEligibilityOpen}
+          profile={eligibility}
+          onSave={(next) => {
+            saveEligibility(next);
+            setEligibleOnly(Boolean(next));
+          }}
+        />
         <div className={styles.kindBar} role="group" aria-label="Filter by opportunity type">
           {KIND_CHIPS.map((chip) => {
             const active = activeKindChip === chip.key;
