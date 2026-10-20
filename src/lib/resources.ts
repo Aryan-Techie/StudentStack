@@ -246,6 +246,25 @@ export async function getResourceBySlug(slug: string): Promise<Resource | null> 
   }
 }
 
+// /compare/[set]: full rows for the given slugs, approved only. Order is
+// left to the caller (see orderForSet in src/lib/comparisons.ts).
+export async function getResourcesForSlugs(slugs: string[]): Promise<Resource[]> {
+  if (slugs.length === 0) return [];
+  const mockFallback = () => MOCK_RESOURCES.filter((r) => slugs.includes(r.slug));
+  if (!hasDatabase()) return mockFallback();
+  try {
+    const rows = await db
+      .select(resourceColumns)
+      .from(resources)
+      .innerJoin(categories, eq(resources.categoryId, categories.id))
+      .where(and(inArray(resources.slug, slugs), eq(resources.approved, true)));
+    return rows.map(toResource);
+  } catch (error) {
+    console.warn("[StudentStack DB] getResourcesForSlugs query failed:", error instanceof Error ? error.message : error);
+    return mockFallback();
+  }
+}
+
 // Sitemap: every approved resource slug plus its last update, so
 // /sitemap.xml can list all per-resource pages with fresh lastModified dates.
 export async function getAllResourceSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {

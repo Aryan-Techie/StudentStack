@@ -48,6 +48,9 @@ export function SiteHeader({}: { total?: number } = {}) {
             <Link href="/deadlines" className={styles.navLink}>
               Deadlines
             </Link>
+            <Link href="/compare" className={styles.navLink}>
+              Compare
+            </Link>
             <a href="#passes-title" className={styles.navLink}>
               How it works
             </a>
@@ -89,6 +92,13 @@ export function SiteHeader({}: { total?: number } = {}) {
           >
             Deadlines
           </Link>
+          <Link
+            href="/compare"
+            className={styles.mobileMenuLink}
+            onClick={() => setMenuOpen(false)}
+          >
+            Compare
+          </Link>
           <a
             href="#passes-title"
             className={styles.mobileMenuLink}
@@ -122,6 +132,9 @@ export function SiteFooter() {
           </Link>
           <Link href="/deadlines" className={styles.navLink}>
             Deadlines
+          </Link>
+          <Link href="/compare" className={styles.navLink}>
+            Compare
           </Link>
           <Link href="/submit" className={styles.navLink}>
             Add a perk

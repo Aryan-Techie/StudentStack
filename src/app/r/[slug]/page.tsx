@@ -4,6 +4,8 @@ import Link from "next/link";
 import { getAllResources, getAllResourceSlugs, getResourceBySlug, type Resource } from "@/lib/resources";
 import { getSiteUrl } from "@/lib/site";
 import { relativeTime } from "@/lib/format";
+import { COST_LABELS, DURATION_LABELS, VERIFICATION_LABELS } from "@/lib/resource-labels";
+import { comparisonSetsForResource } from "@/lib/comparisons";
 import { SiteHeader } from "@/components/home/site-chrome";
 import { ClaimButton } from "@/components/resource/claim-button";
 import { passFontVariables } from "@/lib/fonts";
@@ -58,29 +60,6 @@ export async function generateMetadata({
   };
 }
 
-const VERIFICATION_LABELS: Record<string, string> = {
-  none: "No verification required",
-  edu_email: ".edu university email",
-  github_student_pack: "GitHub Student Developer Pack",
-  student_id: "Student ID upload",
-};
-
-const DURATION_LABELS: Record<string, string> = {
-  one_time: "One-time perk",
-  one_year: "1 year access",
-  while_student: "Valid while enrolled",
-  lifetime: "Lifetime access",
-};
-
-const COST_LABELS: Record<Resource["costType"], string> = {
-  free: "Free",
-  discount: "Discount",
-  credits: "Credits",
-  trial: "Free trial",
-  stipend: "Stipend",
-  scholarship: "Scholarship",
-};
-
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border/60 bg-card/50 px-4 py-3">
@@ -129,6 +108,7 @@ export default async function ResourcePage({
   const related = allResources
     .filter((r) => r.categoryId === resource.categoryId && r.id !== resource.id)
     .slice(0, 6);
+  const comparisons = comparisonSetsForResource(resource.slug);
 
   return (
     <div className={`${passFontVariables} ${homeStyles.root}`}>
@@ -203,6 +183,26 @@ export default async function ResourcePage({
                   </Link>
                 ))}
               </div>
+            ) : null}
+
+            {comparisons.length > 0 ? (
+              <section aria-labelledby="compare-heading" className="mb-12">
+                <h2 id="compare-heading" className="mb-4 text-xl font-semibold">
+                  Compare side by side
+                </h2>
+                <ul className="flex flex-wrap gap-3">
+                  {comparisons.map((set) => (
+                    <li key={set.slug}>
+                      <Link
+                        href={`/compare/${set.slug}`}
+                        className="inline-flex rounded-lg border border-border/60 bg-card/50 px-4 py-2 text-sm font-medium hover:underline"
+                      >
+                        {set.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ) : null}
 
             {related.length > 0 ? (
