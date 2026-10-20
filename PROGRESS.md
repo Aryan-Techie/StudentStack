@@ -3,6 +3,44 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #78 — Opportunity fields on resources
+
+Scholarships, fellowships, internships, mentorships, and programs now fit
+in the same `resources` table as software perks.
+
+- **Schema.** `resources` gains `kind` (`perk` | `scholarship` |
+  `fellowship` | `internship` | `mentorship` | `program`, `NOT NULL
+  DEFAULT 'perk'`), `opens_at`, `recurrence`, `amount`, `provider`, and
+  `eligibility` (`jsonb`, typed as `ResourceEligibility` in
+  `src/db/schema.ts`). `ingestion_candidates` gains `kind`, `deadline`,
+  `opens_at`, `amount`, and `provider` so ingestion sources can carry
+  opportunity data through review.
+- **Admin form.** Create/edit covers every new field plus an eligibility
+  fieldset. Parsing lives in `src/lib/admin/opportunity-fields.ts`, kept
+  free of server-only imports so it is unit tested. Creating a resource
+  from a candidate pre-fills the opportunity fields.
+- **Mock data** gets one program (Google Summer of Code) so the no-DB
+  fallback exercises a non-perk row.
+
+### Judgment calls (#78)
+
+1. **`kind` is separate from category.** Category says what the thing is
+   about (development tools, cloud); kind says what sort of offer it is.
+   A cloud internship and a cloud credit share a category but not a kind.
+2. **Everything new is nullable or defaulted.** The existing 593 rows
+   become `kind = 'perk'` with no data migration.
+3. **Eligibility is one `jsonb` column, not a set of columns.** Every key
+   is optional and an unset key means "open on that axis". Empty
+   eligibility is stored as `NULL`, not `{}`.
+4. **Migrations start here.** The live database was created with
+   `db:push`, so it has no migration history. `drizzle/0000_baseline.sql`
+   records the schema as it was on `main`, and `0001_opportunity_fields.sql`
+   is the additive change (11 `ADD COLUMN`s). Use `db:push` on the live
+   database, or run only `0001` by hand; never run `0000` against it.
+5. **Deadline bug fixed on the way.** The edit form's deadline input had
+   no default value, so saving any resource silently cleared its deadline.
+   It now pre-fills.
+
 ## Status: Phase 2 (PRD §13) — done
 
 Postgres cutover, admin CRUD, and the link-health cron are all live against

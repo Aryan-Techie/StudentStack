@@ -35,6 +35,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Live homepage counts** for resources and categories, read straight from the database at request time.
 - **Minimal admin dashboard** (single allow-listed account, gated by Supabase Auth) for creating, editing, and retiring resources without touching the database directly.
 - **Responsive UI** designed for students browsing primarily on mobile.
+- **Opportunities alongside perks** — each resource has a `kind` (`perk`, `scholarship`, `fellowship`, `internship`, `mentorship`, `program`) plus optional opens-at date, deadline, recurrence, amount, provider, and structured eligibility, all editable in `/admin`.
 - **Student submission flow** at `/submit` (Google or email-link sign-in via Supabase Auth); submissions stay hidden until approved from the review queue in `/admin`.
 
 ---
@@ -84,6 +85,11 @@ scripts/
 ├── normalize-data.ts                      # Raw offers.json → normalized rows
 ├── seed.ts                                # Reload categories/resources into Postgres
 └── create-admin.ts                        # One-time bootstrap of the admin Supabase Auth user
+
+drizzle/
+├── 0000_baseline.sql                      # Schema as it was before migrations were tracked
+├── 0001_opportunity_fields.sql            # Opportunity columns on resources and ingestion candidates
+└── meta/                                  # drizzle-kit snapshots and journal
 ```
 
 Product and design decisions are documented in [PRODUCT.md](PRODUCT.md), [DESIGN.md](DESIGN.md), and [student-resources-prd.md](student-resources-prd.md); implementation notes and judgment calls are logged in [PROGRESS.md](PROGRESS.md).
@@ -170,6 +176,8 @@ Filter state lives in the URL, so any search can be shared or bookmarked as-is:
 
 `/admin` is a minimal dashboard for managing resources without direct database access — create, edit, flip status (`active`/`expired`/`broken`), and delete. It's gated by Supabase Auth to a single allow-listed email (`ADMIN_EMAIL`); every Server Action re-verifies that check independently of the proxy-level redirect, since Next.js middleware alone isn't a sufficient security boundary.
 
+The create/edit form also covers the opportunity fields: kind, opens-at and deadline dates, recurrence (e.g. "annual, opens Feb"), amount, provider, and an eligibility fieldset (study levels, countries, states, fields of study, minimum year, maximum age, gender, income cap in INR). Leave a field empty when the opportunity is open on that axis. Creating a resource from an ingestion candidate pre-fills these fields from the candidate.
+
 ---
 
 ## Data Workflow
@@ -183,6 +191,8 @@ offers.json → scripts/normalize-data.ts → scripts/seed.ts → Supabase
 Normalization maps source categories, regions, cost types, tags, descriptions, and claim URLs into the app's schema. `pnpm db:seed` is idempotent — it clears and reloads the `categories` and `resources` tables every time it runs, so it's safe to re-run whenever `offers.json` changes.
 
 The directory currently loads the full dataset server-side and filters in memory — intentional at ~600 rows, and a paginated query layer can be introduced later if the dataset grows significantly.
+
+Schema changes are tracked as migrations under [`drizzle/`](drizzle). `0000_baseline.sql` is the schema before migrations were introduced and `0001_opportunity_fields.sql` adds the opportunity columns. A database first set up with `pnpm db:push` has no migration history: keep using `pnpm db:push` there, or apply only the new migration files by hand. Don't run `0000_baseline.sql` against an existing database.
 
 ---
 
@@ -202,6 +212,8 @@ The directory currently loads the full dataset server-side and filters in memory
 | `pnpm lint` | Run ESLint |
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm db:push` | Push the Drizzle schema to Postgres |
+| `pnpm db:generate` | Generate a migration under `drizzle/` from schema changes |
+| `pnpm db:migrate` | Apply pending `drizzle/` migrations |
 | `pnpm db:seed` | Reload categories and resources from `offers.json` |
 | `pnpm db:studio` | Open Drizzle Studio to inspect the database |
 | `pnpm test` | Run unit tests with Vitest |
