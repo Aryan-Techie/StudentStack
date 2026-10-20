@@ -86,7 +86,7 @@ export default function ApiDocsPage() {
   "limit": 30,
   "totalPages": 2
 }`}</Block>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm">
               Dates (<Code>deadline</Code>, <Code>opensAt</Code>, <Code>lastVerifiedAt</Code>) are Unix epoch
               milliseconds. Invalid parameters return <Code>400</Code> with an <Code>error</Code> message.
             </p>
