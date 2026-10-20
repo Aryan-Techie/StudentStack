@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CandidateRow, SourceRunSummary } from "./run-ingestion";
+import { urlMatchKey } from "@/lib/submissions";
 
 export async function getExistingCandidateKeys(): Promise<Set<string>> {
   const rows = await db
@@ -14,6 +15,15 @@ export async function getExistingCandidateKeys(): Promise<Set<string>> {
       (r) => `${r.sourceName}:${r.externalId}`,
     ),
   );
+}
+
+// Every candidate still waiting for review, as urlMatchKey()s (issue #40).
+export async function getPendingCandidateUrlKeys(): Promise<Set<string>> {
+  const rows = await db
+    .select({ url: schema.ingestionCandidates.url })
+    .from(schema.ingestionCandidates)
+    .where(eq(schema.ingestionCandidates.status, "pending"));
+  return new Set(rows.flatMap((r) => (r.url ? [urlMatchKey(r.url)] : [])));
 }
 
 export async function insertCandidates(rows: CandidateRow[]): Promise<void> {
@@ -121,4 +131,13 @@ export async function saveSourceRuns(summary: SourceRunSummary[], now: Date = ne
       .values({ name: run.sourceName, ...fields })
       .onConflictDoUpdate({ target: schema.ingestionSources.name, set: fields });
   }
+}
+
+export async function rejectPendingFromSource(sourceName: string): Promise<number> {
+  const rows = await db
+    .update(schema.ingestionCandidates)
+    .set({ status: "rejected", reviewedAt: new Date() })
+    .where(and(eq(schema.ingestionCandidates.sourceName, sourceName), eq(schema.ingestionCandidates.status, "pending")))
+    .returning({ id: schema.ingestionCandidates.id });
+  return rows.length;
 }

@@ -1,6 +1,7 @@
 import type { Resource } from "@/lib/resources";
 import type { CandidateFields, IngestionSource } from "./types";
 import { classifyMatch } from "./classify-match";
+import { urlMatchKey } from "@/lib/submissions";
 
 export type CandidateRow = CandidateFields & {
   sourceName: string;
@@ -27,6 +28,9 @@ export type SourceRunSummary = {
 export type RunOptions = {
   nowMs?: number;
   previousVersions?: Map<string, string | null>;
+  // urlMatchKey()s of candidates already waiting for review, from any
+  // source, so two sources listing the same offer queue it once (#40).
+  pendingUrlKeys?: Set<string>;
 };
 
 export type IngestionRunResult = {
@@ -41,10 +45,12 @@ export async function runIngestion(
   sources: IngestionSource[],
   existingResources: Resource[],
   alreadySeenKeys: Set<string>, // `${sourceName}:${externalId}`
-  { nowMs = Date.now(), previousVersions = new Map() }: RunOptions = {},
+  { nowMs = Date.now(), previousVersions = new Map(), pendingUrlKeys = new Set() }: RunOptions = {},
 ): Promise<IngestionRunResult> {
   const toInsert: CandidateRow[] = [];
   const summary: SourceRunSummary[] = [];
+  const queuedUrlKeys = new Set(pendingUrlKeys);
+  const bySlug = new Map(existingResources.map((r) => [r.slug, r]));
 
   for (const source of sources) {
     const result: SourceRunSummary = {
@@ -62,6 +68,10 @@ export async function runIngestion(
         const previous = previousVersions.get(source.name);
         if (result.version && previous === result.version) {
           result.unchanged = true;
+          summary.push(result);
+          continue;
+        }
+        if (source.baselineFirstRun && result.version && !previousVersions.has(source.name)) {
           summary.push(result);
           continue;
         }
@@ -85,11 +95,21 @@ export async function runIngestion(
           continue;
         }
 
-        const match = classifyMatch(candidate, existingResources);
+        const urlKey = candidate.url ? urlMatchKey(candidate.url) : null;
+        const target = candidate.updateOf ? bySlug.get(candidate.updateOf) : undefined;
+        if (!target && urlKey && queuedUrlKeys.has(urlKey)) {
+          result.duplicates++;
+          continue;
+        }
+
+        const match = target
+          ? ({ kind: "possible_duplicate", matchedResourceId: target.id } as const)
+          : classifyMatch(candidate, existingResources);
         if (match.kind === "duplicate") {
           result.duplicates++;
           continue;
         }
+        if (urlKey) queuedUrlKeys.add(urlKey);
 
         toInsert.push({
           ...candidate,

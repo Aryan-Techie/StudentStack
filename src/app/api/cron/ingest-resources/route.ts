@@ -1,7 +1,13 @@
 import { getAllResources } from "@/lib/resources";
-import { SOURCES } from "@/lib/ingestion/sources";
+import { getSources } from "@/lib/ingestion/sources";
 import { runIngestion } from "@/lib/ingestion/run-ingestion";
-import { getExistingCandidateKeys, getSourceStates, insertCandidates, saveSourceRuns } from "@/lib/ingestion/queries";
+import {
+  getExistingCandidateKeys,
+  getPendingCandidateUrlKeys,
+  getSourceStates,
+  insertCandidates,
+  saveSourceRuns,
+} from "@/lib/ingestion/queries";
 
 export const maxDuration = 270;
 
@@ -11,13 +17,17 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const [resources, alreadySeenKeys, states] = await Promise.all([
+  const [resources, alreadySeenKeys, states, pendingUrlKeys] = await Promise.all([
     getAllResources(),
     getExistingCandidateKeys(),
     getSourceStates(),
+    getPendingCandidateUrlKeys(),
   ]);
   const previousVersions = new Map(states.map((s) => [s.name, s.lastVersion]));
-  const { toInsert, summary } = await runIngestion(SOURCES, resources, alreadySeenKeys, { previousVersions });
+  const { toInsert, summary } = await runIngestion(getSources(), resources, alreadySeenKeys, {
+    previousVersions,
+    pendingUrlKeys,
+  });
   await insertCandidates(toInsert);
   await saveSourceRuns(summary);
 
