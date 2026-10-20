@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { deleteBookmark, isApprovedResource, upsertBookmark } from "@/lib/bookmarks";
 import { isBookmarkStatus, type BookmarkStatus } from "@/lib/bookmark-status";
-import { getOrCreateCalendarToken, rotateCalendarToken } from "@/lib/profiles";
+import { getOrCreateCalendarToken, rotateCalendarToken, setEmailDigest } from "@/lib/profiles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type BookmarkActionResult = { ok: true } | { ok: false; reason: "signed_out" | "invalid" | "failed" };
@@ -64,5 +64,13 @@ export async function resetCalendarFeed(): Promise<void> {
   const userId = await currentUserId();
   if (!userId) return;
   await rotateCalendarToken(userId);
+  revalidatePath("/my-list");
+}
+
+// Weekly digest on/off (issue #38).
+export async function setDigestPreference(formData: FormData): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+  await setEmailDigest(userId, formData.get("enabled") === "true");
   revalidatePath("/my-list");
 }
