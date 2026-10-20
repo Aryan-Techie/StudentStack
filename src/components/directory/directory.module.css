@@ -805,6 +805,12 @@ details[open] > summary .chevronIcon {
   color: var(--d-ink);
 }
 
+.gotItRow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--d-ink-secondary);
+}
+
 .offerTitle {
   font-weight: 700;
   font-size: 0.98rem;

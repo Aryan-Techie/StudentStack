@@ -64,14 +64,14 @@ describe("GET /api/resources", () => {
   it("passes default page and limit through and returns the paginated result", async () => {
     const res = await get("/api/resources");
     expect(res.status).toBe(200);
-    expect(mockGet).toHaveBeenCalledWith(1, DEFAULT_PAGE_SIZE);
+    expect(mockGet).toHaveBeenCalledWith(1, DEFAULT_PAGE_SIZE, {});
     expect(await res.json()).toEqual(canned);
   });
 
   it("honors page and limit params", async () => {
     const res = await get("/api/resources?page=2&limit=5");
     expect(res.status).toBe(200);
-    expect(mockGet).toHaveBeenCalledWith(2, 5);
+    expect(mockGet).toHaveBeenCalledWith(2, 5, {});
     expect(await res.json()).toEqual(canned);
   });
 
@@ -100,6 +100,41 @@ describe("GET /api/resources", () => {
   it("clamps an oversized limit to MAX_PAGE_SIZE", async () => {
     const res = await get(`/api/resources?limit=${MAX_PAGE_SIZE + 500}`);
     expect(res.status).toBe(200);
-    expect(mockGet).toHaveBeenCalledWith(1, MAX_PAGE_SIZE);
+    expect(mockGet).toHaveBeenCalledWith(1, MAX_PAGE_SIZE, {});
+  });
+
+  it("passes parsed filters through and sets CDN cache headers", async () => {
+    const res = await get("/api/resources?kind=scholarship,fellowship&category=cloud-and-hosting&region=IN&deadline_before=2026-12-31");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=60, stale-while-revalidate=300");
+    expect(mockGet).toHaveBeenCalledWith(1, DEFAULT_PAGE_SIZE, {
+      kind: ["scholarship", "fellowship"],
+      category: "cloud-and-hosting",
+      region: "IN",
+      deadlineBefore: new Date("2026-12-31"),
+    });
+  });
+
+  it.each([
+    ["kind=grant", "kind"],
+    ["kind=", "kind"],
+    ["category=Not A Slug", "category"],
+    ["region=US", "region"],
+    ["deadline_before=next-week", "deadline_before"],
+  ])("rejects %s", async (query, param) => {
+    const res = await get(`/api/resources?${query}`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(`'${param}'`);
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it("rate limits a single client", async () => {
+    const headers = { "x-forwarded-for": "203.0.113.9" };
+    let last: Response | undefined;
+    for (let i = 0; i < 61; i++) {
+      last = await GET(new Request("http://localhost/api/resources", { headers }));
+    }
+    expect(last?.status).toBe(429);
+    expect(last?.headers.get("Retry-After")).not.toBeNull();
   });
 });

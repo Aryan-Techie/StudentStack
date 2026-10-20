@@ -3,7 +3,15 @@ import { isBlockedIp, METADATA_HOSTNAMES } from "@/lib/ip-ranges";
 
 export const SUBMISSION_COST_TYPES = ["free", "discount", "credits", "trial", "scholarship", "stipend"] as const;
 
-export type SubmissionField = "name" | "url" | "tagline" | "description" | "categoryId" | "costType" | "region";
+export type SubmissionField =
+  | "name"
+  | "url"
+  | "tagline"
+  | "description"
+  | "categoryId"
+  | "costType"
+  | "region"
+  | "credit";
 export type SubmissionErrors = Partial<Record<SubmissionField, string>>;
 
 export type SubmissionValue = {
@@ -14,9 +22,10 @@ export type SubmissionValue = {
   categoryId: number;
   costType: Resource["costType"];
   region: Resource["region"];
+  credit: string | null;
 };
 
-const LIMITS = { name: 80, url: 500, tagline: 90, descriptionMin: 20, description: 600 };
+const LIMITS = { name: 80, url: 500, tagline: 90, descriptionMin: 20, description: 600, credit: 40 };
 
 // Only http(s) links with a real hostname. Drops the #fragment and a bare
 // trailing "/" so the duplicate check sees one spelling per link.
@@ -86,6 +95,11 @@ export function validateSubmission(
 
   const region: Resource["region"] = input.region === "IN" ? "IN" : "Global";
 
+  // Public contributor credit (issue #82): plain text only, no links.
+  const credit = (input.credit ?? "").replace(/\s+/g, " ").trim();
+  if (credit.length > LIMITS.credit) errors.credit = `Keep the credit under ${LIMITS.credit} characters.`;
+  else if (/https?:|www\.|[<>]/i.test(credit)) errors.credit = "Use a name, not a link.";
+
   if (Object.keys(errors).length > 0 || !url || !isCostType) return { ok: false, errors };
   return {
     ok: true,
@@ -97,6 +111,7 @@ export function validateSubmission(
       categoryId,
       costType: costType as Resource["costType"],
       region,
+      credit: credit || null,
     },
   };
 }

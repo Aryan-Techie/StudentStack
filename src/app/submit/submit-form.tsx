@@ -145,6 +145,17 @@ function SubmitFormInner({ categories, onAddAnother }: { categories: Category[];
         </Select>
       </div>
 
+      <Field
+        id="submit-credit"
+        name="credit"
+        label="Credit me as (optional)"
+        hint="Shown as “Added by …” on the offer’s page once it’s approved. Leave blank to stay anonymous."
+        error={errors.credit}
+        defaultValue={values.credit}
+        maxLength={40}
+        placeholder="e.g. Priya, IIT Madras"
+      />
+
       <div>
         <button type="submit" className={styles.cta} disabled={pending}>
           {pending ? "Sending…" : "Send for review"}

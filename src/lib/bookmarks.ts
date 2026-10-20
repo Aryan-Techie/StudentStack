@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { BookmarkStatus } from "@/lib/bookmark-status";
 
@@ -71,4 +71,34 @@ export async function isApprovedResource(resourceId: number): Promise<boolean> {
     .where(and(eq(resources.id, resourceId), eq(resources.approved, true)))
     .limit(1);
   return Boolean(row);
+}
+
+// "N students got this" (issue #82): aggregate counts only, so no
+// individual student's list is ever exposed.
+export async function getGotItCounts(): Promise<Record<number, number>> {
+  if (!process.env.POSTGRES_URL) return {};
+  try {
+    const rows = await db
+      .select({ resourceId: bookmarks.resourceId, count: sql<number>`count(*)` })
+      .from(bookmarks)
+      .where(eq(bookmarks.status, "got_it"))
+      .groupBy(bookmarks.resourceId);
+    return Object.fromEntries(rows.map((r) => [r.resourceId, Number(r.count)]));
+  } catch (error) {
+    console.warn("[bookmarks] got-it counts failed:", error instanceof Error ? error.message : error);
+    return {};
+  }
+}
+
+export async function getGotItCount(resourceId: number): Promise<number> {
+  if (!process.env.POSTGRES_URL) return 0;
+  try {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(bookmarks)
+      .where(and(eq(bookmarks.resourceId, resourceId), eq(bookmarks.status, "got_it")));
+    return Number(row?.count ?? 0);
+  } catch {
+    return 0;
+  }
 }

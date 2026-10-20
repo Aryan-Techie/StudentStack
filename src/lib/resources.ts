@@ -1,9 +1,10 @@
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { MOCK_CATEGORIES, MOCK_RESOURCES } from "./mock-data";
 import { normalizePagination, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./pagination";
 import type { ResourceEligibility } from "@/db/schema";
 import { urlMatchKey } from "./submissions";
+import { matchesApiFilters, type ApiFilters } from "./api-filters";
 
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE };
 export type { ResourceEligibility };
@@ -67,6 +68,10 @@ export type Resource = {
   eligibility?: ResourceEligibility | null;
   // Review aggregate (issue #37), merged in by pages that show ratings.
   rating?: { average: number; count: number } | null;
+  // Community signals (issue #82): how many students marked this "Got it"
+  // (merged in by pages that show it) and the submitter's optional credit.
+  gotItCount?: number;
+  contributorCredit?: string | null;
   status: "active" | "expired" | "broken";
   lastVerifiedAt: number | null;
 };
@@ -105,6 +110,7 @@ const resourceColumns = {
   amount: resources.amount,
   provider: resources.provider,
   eligibility: resources.eligibility,
+  contributorCredit: resources.contributorCredit,
   status: resources.status,
   lastVerifiedAt: resources.lastVerifiedAt,
   categorySlug: categories.slug,
@@ -160,9 +166,32 @@ export type PaginatedResources = {
   totalPages: number;
 };
 
+// SQL twin of matchesApiFilters() in src/lib/api-filters.ts (issue #82).
+function apiFilterConditions(f: ApiFilters, now: Date): SQL[] {
+  const conditions: SQL[] = [];
+  if (f.kind?.length) conditions.push(inArray(resources.kind, f.kind));
+  if (f.category) conditions.push(eq(categories.slug, f.category));
+  if (f.region === "IN") {
+    conditions.push(
+      sql`(${resources.region} = 'IN' or 'IN' = any(${resources.regions}) or not ${resources.regionLocked})`,
+    );
+  }
+  if (f.region === "Global") conditions.push(eq(resources.regionLocked, false));
+  if (f.deadlineBefore) {
+    conditions.push(
+      eq(resources.status, "active"),
+      isNotNull(resources.deadline),
+      gte(resources.deadline, now),
+      lte(resources.deadline, f.deadlineBefore),
+    );
+  }
+  return conditions;
+}
+
 export async function getResourcesPaginated(
   page: number = 1,
   limit: number = DEFAULT_PAGE_SIZE,
+  filters: ApiFilters = {},
 ): Promise<PaginatedResources> {
   const { page: safePage, limit: safeLimit } = normalizePagination(page, limit);
   const offset = (safePage - 1) * safeLimit;
@@ -175,23 +204,28 @@ export async function getResourcesPaginated(
     totalPages: Math.max(1, Math.ceil(total / safeLimit)),
   });
 
+  const now = new Date();
   const mockResult = () => {
-    const sorted = [...MOCK_RESOURCES].sort((a, b) => a.id - b.id);
+    const sorted = MOCK_RESOURCES.filter((r) => matchesApiFilters(r, filters, now.getTime())).sort(
+      (a, b) => a.id - b.id,
+    );
     return finish(sorted.slice(offset, offset + safeLimit), sorted.length);
   };
 
   if (!hasDatabase()) return mockResult();
   try {
+    const where = and(eq(resources.approved, true), ...apiFilterConditions(filters, now));
     const [countRow, rows] = await Promise.all([
       db
         .select({ count: sql<number>`count(*)` })
         .from(resources)
-        .where(eq(resources.approved, true)),
+        .innerJoin(categories, eq(resources.categoryId, categories.id))
+        .where(where),
       db
         .select(resourceColumns)
         .from(resources)
         .innerJoin(categories, eq(resources.categoryId, categories.id))
-        .where(eq(resources.approved, true))
+        .where(where)
         .orderBy(resources.id)
         .limit(safeLimit)
         .offset(offset),

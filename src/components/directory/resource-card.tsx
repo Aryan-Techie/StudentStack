@@ -204,6 +204,12 @@ export function ResourceCard({
         {resource.categoryName}
       </span>
 
+      {resource.gotItCount ? (
+        <p className={styles.gotItRow}>
+          {resource.gotItCount} student{resource.gotItCount === 1 ? "" : "s"} got this
+        </p>
+      ) : null}
+
       <p className={styles.verifyRow}>
         <GraduationCap className={styles.verifyIcon} aria-hidden />
         <span>{verificationText(resource)}</span>

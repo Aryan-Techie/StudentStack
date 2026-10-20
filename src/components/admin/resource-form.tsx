@@ -289,6 +289,15 @@ export function ResourceForm({
           />
         </label>
       </fieldset>
+      <label className="flex flex-col gap-1 text-sm">
+        Contributor credit
+        <input
+          name="contributorCredit"
+          maxLength={40}
+          defaultValue={resource?.contributorCredit ?? ""}
+          className="border-line rounded border px-3 py-2"
+        />
+      </label>
       {resource && (
         <label className="flex flex-col gap-1 text-sm">
           Status

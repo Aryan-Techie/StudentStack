@@ -146,6 +146,9 @@ export function SiteFooter() {
           <Link href="/compare" className={styles.navLink}>
             Compare
           </Link>
+          <Link href="/api-docs" className={styles.navLink}>
+            API &amp; Agents
+          </Link>
           <Link href="/submit" className={styles.navLink}>
             Add a perk
           </Link>
