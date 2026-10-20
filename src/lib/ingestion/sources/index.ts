@@ -6,12 +6,14 @@ import type { IngestionSource } from "../types";
 import { apifySources } from "./apify";
 import { brabble, scholars4dev } from "./feeds";
 import { ayushPrograms, deepanshuPrograms, eduPerks, githubStudentPack, yashisraniPrograms } from "./github";
+import { opportunityDeskSource } from "./opportunity-desk";
 import { vendorWatchSources } from "./vendor-watch";
 
 // Built fresh for every cron run: some sources cache their fetch for the
 // length of one run (see vendor-watch.ts).
 export function getSources(env: NodeJS.ProcessEnv = process.env): IngestionSource[] {
   return [
+    opportunityDeskSource,
     scholars4dev,
     brabble,
     yashisraniPrograms,
