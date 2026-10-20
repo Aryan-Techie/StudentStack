@@ -310,6 +310,32 @@ PRD §8.11 on top of the existing `reviews` table.
   one noisy client; the CDN cache absorbs most repeat traffic. A shared
   store (e.g. Redis) would be needed for a hard global limit.
 - **Got-it counts expose numbers only**, never which students.
+## Issue #38 — Weekly digest email
+
+PRD §8.12's weekly digest, sent with Resend.
+
+- **Cron.** `/api/cron/weekly-digest` runs Fridays 03:30 UTC (09:00 IST,
+  `vercel.json`). It requires `Bearer ${CRON_SECRET}` and refuses to run
+  when `CRON_SECRET` is unset, so `Bearer undefined` can't pass. Without
+  `RESEND_API_KEY` and `DIGEST_FROM_EMAIL` it returns `{ skipped: … }` and
+  sends nothing, so the feature is safe to deploy before Resend is set up.
+- **Content** (`src/lib/digest-data.ts`): approved, active resources created
+  in the last 7 days, and ones with a deadline in the next 7 days, up to 10
+  each. Both empty → no email.
+- **Recipients**: every Supabase Auth user with a confirmed email, paged
+  through `auth.admin.listUsers` (service-role key), minus
+  `profiles.email_digest = false`. On by default, as the issue asked.
+  Migration `drizzle/0006_email_digest.sql` adds the column.
+- **Email** (`src/lib/digest.ts`): inline-styled HTML plus a plain-text
+  part, everything HTML-escaped, no template engine. Sending
+  (`src/lib/email.ts`) is plain `fetch` to Resend's `/emails/batch`, 100 per
+  request; a failed batch is counted and logged without stopping the run.
+- **Unsubscribe.** Links carry an HMAC of the user id (`DIGEST_SECRET`,
+  falling back to `CRON_SECRET`), checked with `timingSafeEqual`.
+  `/digest/unsubscribe` asks for a button click instead of acting on GET,
+  because email link scanners fetch every URL. RFC 8058 `List-Unsubscribe`
+  headers point at `POST /api/digest/unsubscribe` for Gmail/Yahoo's own
+  button. `/my-list` shows the current setting with an on/off button.
 
 ## Status: Phase 2 (PRD §13) — done
 

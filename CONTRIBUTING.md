@@ -32,6 +32,9 @@ Supabase project**. Do not commit `.env.local`, credentials, or exported user da
 | `ADMIN_EMAIL` | Account allowed into the admin dashboard |
 | `CRON_SECRET` | Authentication for the link-health cron endpoint |
 | `SUBMISSIONS_WEBHOOK_URL` | Optional webhook pinged when a student submits an offer; falls back to `LINK_HEALTH_WEBHOOK_URL` |
+| `RESEND_API_KEY` | Optional: Resend API key for the weekly digest email |
+| `DIGEST_FROM_EMAIL` | Optional: verified sender address for the weekly digest |
+| `DIGEST_SECRET` | Optional: signs digest unsubscribe links (defaults to `CRON_SECRET`) |
 
 Use the Supavisor pooler host as described in the README. The direct Supabase
 database host may require IPv6 connectivity.
