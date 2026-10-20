@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { extractDeadline, mapOpportunityDeskItem, parseRssItems } from "./opportunity-desk";
 
 describe("extractDeadline", () => {
