@@ -31,6 +31,7 @@ Supabase project**. Do not commit `.env.local`, credentials, or exported user da
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key for the admin creation script |
 | `ADMIN_EMAIL` | Account allowed into the admin dashboard |
 | `CRON_SECRET` | Authentication for the link-health cron endpoint |
+| `SUBMISSIONS_WEBHOOK_URL` | Optional webhook pinged when a student submits an offer; falls back to `LINK_HEALTH_WEBHOOK_URL` |
 
 Use the Supavisor pooler host as described in the README. The direct Supabase
 database host may require IPv6 connectivity.
