@@ -47,6 +47,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Public read API and agent docs**: `GET /api/resources` (filters for `kind`, `category`, `region`, `deadline_before`) and `GET /api/resources/{slug}`, cached at the CDN and rate limited per client. `/api-docs` documents them with `curl` examples and `/llms.txt` gives AI agents a map of the site; both are linked from the footer.
 - **Community credits**: cards and resource pages show "N students got this" (an aggregate count only), and `/submit` has an optional "Credit me as" field shown as "Added by …" once a submission is approved.
 - **Weekly digest email** sent with [Resend](https://resend.com/) every Friday: offers added that week plus deadlines closing in the next 7 days. On by default for signed-in students, with a signed one-click unsubscribe link and an on/off toggle on `/my-list`.
+- **Automated ingestion** twice a week (Mondays and Thursdays) from RSS feeds, curated GitHub lists, the GitHub Student Developer Pack page, and optional Apify scrapers. New finds land in the `/admin/ingestion` review queue; opportunities whose deadline has already passed are never queued.
 
 ---
 
@@ -66,6 +67,7 @@ offers.json → scripts/normalize-data.ts → scripts/seed.ts → Supabase Postg
 | **Auth** | Supabase Auth, gating `/admin` behind a single allow-listed email (`ADMIN_EMAIL`) |
 | **Scheduled Jobs** | [Vercel Cron](https://vercel.com/docs/cron-jobs) triggers `/api/cron/link-health` every Monday 03:00 UTC |
 | **Email** | [Resend](https://resend.com/) HTTP API sends the weekly digest from `/api/cron/weekly-digest` every Friday 03:30 UTC |
+| **Ingestion** | Vercel Cron triggers `/api/cron/ingest-resources` every Monday and Thursday 04:00 UTC |
 | **Client-Side Search** | [Fuse.js](https://www.fusejs.io/) fuzzy-matches across name, offer, description, and tags |
 
 ```text
@@ -116,6 +118,9 @@ src/
 │   ├── admin/auth.ts                      # Admin session verification
 │   ├── supabase/                          # Supabase client helpers (browser + server)
 │   └── ingestion/                         # Resource ingestion pipeline
+│       ├── sources/                       # RSS, GitHub list, GitHub Pack page, and Apify sources
+│       ├── rss.ts                         # RSS parser and deadline extraction
+│       └── markdown.ts                    # Markdown table and link-list parsers
 └── proxy.ts                               # Next.js 16 middleware equivalent — refreshes admin sessions
 
 scripts/
@@ -166,6 +171,8 @@ SUBMISSIONS_WEBHOOK_URL=   # optional: Slack/JSON webhook pinged on each new /su
 RESEND_API_KEY=            # optional: Resend API key for the weekly digest (set by the Vercel Resend integration)
 DIGEST_FROM_EMAIL=         # optional: verified digest sender, e.g. "StudentStack <digest@yourdomain>"
 DIGEST_SECRET=             # optional: signs digest unsubscribe links (defaults to CRON_SECRET)
+APIFY_TOKEN=               # optional: enables the paid Apify ingestion sources (billed per run to your Apify account)
+GITHUB_TOKEN=              # optional: raises the GitHub API rate limit for ingestion change detection
 ```
 
 ### 3. Install, Migrate, and Seed
@@ -239,12 +246,28 @@ Normalization maps source categories, regions, cost types, tags, descriptions, a
 The directory currently loads the full dataset server-side and filters in memory — intentional at ~600 rows, and a paginated query layer can be introduced later if the dataset grows significantly.
 
 Schema changes are tracked as migrations under [`drizzle/`](drizzle). `0000_baseline.sql` is the schema before migrations were introduced and `0001_opportunity_fields.sql` adds the opportunity columns. A database first set up with `pnpm db:push` has no migration history: keep using `pnpm db:push` there, or apply only the new migration files by hand. Don't run `0000_baseline.sql` against an existing database.
+### Automated Ingestion
+
+`GET /api/cron/ingest-resources`, triggered by Vercel Cron every Monday and Thursday at 04:00 UTC, pulls candidates from the sources registered in `src/lib/ingestion/sources/` and queues new ones for review at `/admin/ingestion`. Nothing is published without admin approval. The route requires a `Bearer ${CRON_SECRET}` header.
+
+| Source | What it adds |
+|--------|--------------|
+| Scholars4Dev RSS | Scholarships, with the deadline extracted from the post |
+| Brabble RSS | Indian hackathons and coding contests |
+| `yashisrani/List-of-OpenSource-Programs`, `ayush-sleeping/Every-Open-Source-Programs`, `deepanshu1422/List-Of-Open-Source-Internships-Programs` | Open-source programs, mentorships, internships, and fellowships |
+| `sdhutchins/awesome-edu-perks` | US student perks |
+| GitHub Student Developer Pack page | Pack partner offers |
+| Apify actors (only when `APIFY_TOKEN` is set) | Scholarships, hackathons, Unstop listings, and flagship Internshala internships |
+
+GitHub sources report the latest commit SHA of their file (using `GITHUB_TOKEN` when set), and a source whose fingerprint hasn't changed since the last run is skipped without downloading. Each source's last fingerprint, status, error, and counts are stored in the `ingestion_sources` table (migration `drizzle/0007_ingestion_sources.sql`); a failed run keeps the old fingerprint so the next run retries. Candidates whose deadline has already passed are dropped and counted as `expired` in the run summary.
 
 ---
 
 ## Link-Health Checks
 
 `GET /api/cron/link-health`, triggered weekly by Vercel Cron (see [`vercel.json`](vercel.json)), re-checks every resource that has a static claim URL and hasn't been manually marked `expired`. It issues a `HEAD` request (falling back to `GET` on `405`/`501`), classifies the result as `active` or `broken`, and revalidates the homepage and directory so status changes show up immediately. The route requires a `Bearer ${CRON_SECRET}` header and runs up to 25 checks concurrently.
+
+Before checking links, the same cron rolls over past deadlines: an approved resource whose deadline has passed is marked `expired` if it has no `recurrence`, or has its deadline cleared if it does, so the "Opens again ~<recurrence>" label stays. Rows expired this way aren't link-checked in that run, and `/deadlines` is revalidated along with the homepage and directory.
 
 ---
 
@@ -318,6 +341,7 @@ Any platform that supports Node.js 20+ and can run `pnpm build && pnpm start` wi
 - Set all required environment variables
 - Configure a cron/scheduler to hit `/api/cron/link-health` weekly with the `CRON_SECRET` Bearer token
 - Configure a cron/scheduler to hit `/api/cron/weekly-digest` every Friday with the same Bearer token if you use the weekly digest
+- Configure a cron/scheduler to hit `/api/cron/ingest-resources` every Monday and Thursday with the same Bearer token
 - Run `pnpm db:push` and `pnpm db:seed` against your Supabase project before deploying
 
 ---
