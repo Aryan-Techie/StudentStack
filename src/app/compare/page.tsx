@@ -27,11 +27,11 @@ export default function CompareIndexPage() {
           </header>
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {COMPARISON_SETS.map((set) => (
-              <li key={set.slug} className="rounded-lg border border-border/60 bg-card/50 p-4">
+              <li key={set.slug} className="rounded-lg border border-[var(--d-line)] bg-[var(--d-surface)] p-4">
                 <Link href={`/compare/${set.slug}`} className="font-medium hover:underline">
                   {set.name}
                 </Link>
-                <p className="mt-1 text-sm text-muted-foreground">{set.description}</p>
+                <p className="mt-1 text-sm text-[var(--d-muted)]">{set.description}</p>
               </li>
             ))}
           </ul>

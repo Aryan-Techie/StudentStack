@@ -76,7 +76,7 @@ export default async function ComparePage({
             <span aria-hidden className="mx-2">/</span>
             <Link href="/compare" className="hover:underline">Compare</Link>
             <span aria-hidden className="mx-2">/</span>
-            <span aria-current="page" className="text-foreground">{set.name}</span>
+            <span aria-current="page" className="text-[var(--d-ink)]">{set.name}</span>
           </nav>
 
           <header className="mb-8">
@@ -90,9 +90,9 @@ export default async function ComparePage({
             <div className="mb-12 overflow-x-auto rounded-lg border border-border/60">
               <table className="w-full min-w-[720px] border-collapse text-left text-sm">
                 <caption className="sr-only">{set.name}</caption>
-                <thead className="bg-muted/40">
+                <thead className="bg-[var(--d-surface)]">
                   <tr>
-                    <th scope="col" className="sticky left-0 bg-muted px-4 py-3 font-semibold">Offer</th>
+                    <th scope="col" className="sticky left-0 bg-[var(--d-surface)] px-4 py-3 font-semibold">Offer</th>
                     {COLUMNS.map((c) => (
                       <th key={c.label} scope="col" className="px-4 py-3 font-semibold">{c.label}</th>
                     ))}
@@ -102,7 +102,7 @@ export default async function ComparePage({
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id} className="border-t border-border/60 align-top">
-                      <th scope="row" className="sticky left-0 bg-background px-4 py-3 font-medium">
+                      <th scope="row" className="sticky left-0 bg-[var(--d-ground)] px-4 py-3 font-medium">
                         <Link href={`/r/${r.slug}`} className="hover:underline">{r.name}</Link>
                         {r.status !== "active" ? (
                           <span className="ml-2 text-xs font-normal text-muted-foreground">({r.status})</span>
@@ -134,7 +134,7 @@ export default async function ComparePage({
                 <li key={s.slug}>
                   <Link
                     href={`/compare/${s.slug}`}
-                    className="inline-flex rounded-lg border border-border/60 bg-card/50 px-4 py-2 text-sm font-medium hover:underline"
+                    className="inline-flex rounded-lg border border-[var(--d-line)] bg-[var(--d-surface)] px-4 py-2 text-sm font-medium hover:underline"
                   >
                     {s.name}
                   </Link>
