@@ -154,6 +154,42 @@ existing `bookmarks` table (primary key `(user_id, resource_id)`, status
   a browser; `/my-list` and `/submit` both return 500 when
   `NEXT_PUBLIC_SUPABASE_URL` is unset. `/api/bookmarks` answers
   `signedIn: false` in that case, so cards still render.
+## Issue #34 — Branch and year personalization
+
+Students can tell us their branch and year once, and the directory uses
+that to rank offers. It is a ranking boost only: every resource stays
+visible.
+
+- **Schema.** New `profiles` table keyed by the Supabase auth user id
+  (`user_id`, `branch`, `year`, `completed_onboarding`, timestamps), RLS
+  enabled like `bookmarks`. Migration `drizzle/0002_profiles.sql`.
+- **Onboarding.** `/onboarding` is a two-select form (branch, year) with
+  Save and "Skip for now". `/auth/callback` sends a student there after
+  sign-in until `completed_onboarding` is true, then on to the original
+  `next` path. `/my-list` links to it so the answers can be changed later.
+  The proxy matcher now covers `/onboarding`.
+- **"For you" sort.** `GET /api/profile` returns
+  `{ signedIn, profile: { branch, year } | null }` with `Cache-Control:
+  private, no-store`. The directory fetches it client-side; when a branch
+  or year is set, the sort menu gains "For you" and selects it by default.
+  Scoring lives in `src/lib/personalization.ts` and is unit tested.
+
+### Judgment calls (#34)
+
+1. **Branch tags are derived, not stored.** A resource's branches come from
+   its category, its tags, and a short list of flagship tool names
+   (MATLAB, SolidWorks, AutoCAD…). Changing the mapping needs no backfill.
+2. **Score is small and stable.** +2 for a branch match; for opportunities
+   with a `minYear`, +1 if the student has reached it and −1 if not. Ties
+   keep the Recommended order, and broken or expired links are still
+   demoted below active ones.
+3. **Skipping counts as done.** "Skip for now" saves an empty profile with
+   `completed_onboarding = true`, so a student who skips isn't asked again
+   on every sign-in.
+4. **Never blocks sign-in.** If the profile lookup in `/auth/callback`
+   fails, the student goes straight to `next`.
+5. **The profile is fetched client-side.** The server-rendered directory
+   is identical for every visitor; only `/api/profile` is per-user.
 
 ## Status: Phase 2 (PRD §13) — done
 
