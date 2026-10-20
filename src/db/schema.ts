@@ -137,6 +137,9 @@ export const profiles = pgTable("profiles", {
   branch: text("branch"),
   year: integer("year"),
   completedOnboarding: boolean("completed_onboarding").notNull().default(false),
+  // Admin access (issue #42): "admin" can use /admin in addition to the
+  // ADMIN_EMAIL allow-list. Granted with scripts/grant-admin.ts.
+  role: text("role", { enum: ["student", "admin"] }).notNull().default("student"),
   // Synced copy of the accountless eligibility profile (issue #84): country,
   // state, degree level, and verification methods. Branch and year live in
   // the columns above.
@@ -214,7 +217,9 @@ export const ingestionCandidates = pgTable("ingestion_candidates", {
   rawPayload: text("raw_payload"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
-});
+  // RLS was missing here, which left the table readable and writable
+  // through Supabase's Data API with the public key (issue #42).
+}).enableRLS();
 
 // Per-source state for the ingestion cron (issues #83, #40): the last
 // upstream fingerprint (for change detection) and the last run's outcome
