@@ -349,3 +349,16 @@ describe("ResourceCard visual and verification variants", () => {
     expect(onTagClick).toHaveBeenCalledWith("AI");
   });
 });
+
+describe("ResourceCard rating", () => {
+  it("shows the review aggregate when the resource has reviews", () => {
+    render(<ResourceCard resource={{ ...mockResource, rating: { average: 4.25, count: 12 } }} onTagClick={vi.fn()} />);
+    expect(screen.getByRole("img", { name: "4.3 out of 5 stars" })).not.toBeNull();
+    expect(screen.getByText("4.3 (12)")).not.toBeNull();
+  });
+
+  it("shows no rating row without reviews", () => {
+    render(<ResourceCard resource={mockResource} onTagClick={vi.fn()} />);
+    expect(screen.queryByRole("img", { name: /out of 5 stars/ })).toBeNull();
+  });
+});

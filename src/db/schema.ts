@@ -13,6 +13,7 @@ import {
   uuid,
   primaryKey,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // Structured eligibility for opportunities (issue #78). Every field is
@@ -151,16 +152,25 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }).enableRLS();
 
-export const reviews = pgTable("reviews", {
-  id: serial("id").primaryKey(),
-  resourceId: integer("resource_id")
-    .notNull()
-    .references(() => resources.id),
-  userId: uuid("user_id").notNull(),
-  rating: integer("rating").notNull(),
-  comment: text("comment"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}).enableRLS();
+// Reviews (issue #37): one per student per resource, enforced by the
+// unique index. `verifiedStudent` records whether the author signed in with
+// an academic email when they wrote it, for the "Verified student" badge.
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: serial("id").primaryKey(),
+    resourceId: integer("resource_id")
+      .notNull()
+      .references(() => resources.id),
+    userId: uuid("user_id").notNull(),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    verifiedStudent: boolean("verified_student").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("reviews_resource_user_unique").on(t.resourceId, t.userId)],
+).enableRLS();
 
 export const clickEvents = pgTable("click_events", {
   id: serial("id").primaryKey(),

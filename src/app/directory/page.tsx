@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
 import { getAllResources, getAllTags, getCategories, getResourceCount } from "@/lib/resources";
 import { PRESETS } from "@/lib/presets";
+import { getRatingSummaries } from "@/lib/reviews";
 import dirStyles from "@/components/directory/directory.module.css";
 import homeStyles from "@/components/home/brand.module.css";
 
@@ -21,11 +22,13 @@ export default async function DirectoryPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const [resources, categories, total] = await Promise.all([
+  const [rows, categories, total, ratings] = await Promise.all([
     getAllResources(),
     getCategories(),
     getResourceCount(),
+    getRatingSummaries(),
   ]);
+  const resources = rows.map((r) => (ratings[r.id] ? { ...r, rating: ratings[r.id] } : r));
   const allTags = getAllTags(resources);
   const { q } = await searchParams;
   const count = resources.length || total;

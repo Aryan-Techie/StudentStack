@@ -13,6 +13,7 @@ import type { Resource } from "@/lib/resources";
 import { relativeTime } from "@/lib/format";
 import { ReportBrokenLink } from "./report-broken-link";
 import { BookmarkButton } from "@/components/bookmarks/bookmark-button";
+import { RatingStars } from "@/components/reviews/rating-stars";
 import { GraduationCap, CheckCircle2, ArrowUpRight, Link as LinkIcon, Check } from "lucide-react";
 import styles from "./directory.module.css";
 
@@ -189,6 +190,15 @@ export function ResourceCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {resource.rating ? (
+        <a href={`/r/${resource.slug}#reviews-heading`} className={styles.ratingRow}>
+          <RatingStars value={resource.rating.average} size={12} />
+          <span>
+            {resource.rating.average.toFixed(1)} ({resource.rating.count})
+          </span>
+        </a>
+      ) : null}
 
       <span className={`${styles.catPill} ${catClass(resource.categoryName)}`}>
         {resource.categoryName}
