@@ -27,7 +27,12 @@ export async function GET(request: NextRequest) {
     failed = Boolean(error);
   }
 
-  if (failed) return NextResponse.redirect(`${origin}/submit?error=link`);
+  // Send a failed sign-in back to the page that started it (/submit or
+  // /my-list), which shows the error above its sign-in panel.
+  if (failed) {
+    const back = new URL(next, origin).pathname;
+    return NextResponse.redirect(`${origin}${back}?error=link`);
+  }
   return NextResponse.redirect(`${origin}${next}`);
 }
 

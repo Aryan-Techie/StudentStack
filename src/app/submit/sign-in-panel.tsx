@@ -6,7 +6,15 @@ import { signInWithEmail, signInWithGoogle, type EmailSignInState } from "./acti
 
 const initialState: EmailSignInState = { status: "idle" };
 
-export function SignInPanel() {
+export function SignInPanel({
+  next = "/submit",
+  title = "Sign in to add a perk",
+  hint = "Your account only links a submission to you so we can follow up. Your name and email aren’t shown anywhere on the site.",
+}: {
+  next?: string;
+  title?: string;
+  hint?: string;
+} = {}) {
   const [state, emailAction, pending] = useActionState(signInWithEmail, initialState);
 
   if (state.status === "sent") {
@@ -26,14 +34,12 @@ export function SignInPanel() {
   return (
     <div className={styles.panelStack}>
       <div className={styles.notice}>
-        <h2 className={styles.panelTitle}>Sign in to add a perk</h2>
-        <p className={styles.hint}>
-          Your account only links a submission to you so we can follow up. Your name and email aren’t shown anywhere
-          on the site.
-        </p>
+        <h2 className={styles.panelTitle}>{title}</h2>
+        <p className={styles.hint}>{hint}</p>
       </div>
 
       <form action={signInWithGoogle}>
+        <input type="hidden" name="next" value={next} />
         <button type="submit" className={styles.googleButton}>
           Continue with Google
         </button>
@@ -42,6 +48,7 @@ export function SignInPanel() {
       <p className={styles.divider}>or get a link by email</p>
 
       <form action={emailAction} className={styles.fieldStack} noValidate>
+        <input type="hidden" name="next" value={next} />
         <div className={styles.field}>
           <label htmlFor="signin-email" className={styles.label}>
             Email

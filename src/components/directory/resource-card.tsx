@@ -12,7 +12,8 @@ import {
 import type { Resource } from "@/lib/resources";
 import { relativeTime } from "@/lib/format";
 import { ReportBrokenLink } from "./report-broken-link";
-import { GraduationCap, CheckCircle2, ArrowUpRight, Bookmark, Link as LinkIcon, Check } from "lucide-react";
+import { BookmarkButton } from "@/components/bookmarks/bookmark-button";
+import { GraduationCap, CheckCircle2, ArrowUpRight, Link as LinkIcon, Check } from "lucide-react";
 import styles from "./directory.module.css";
 
 const COST_LABEL: Record<Resource["costType"], string> = {
@@ -164,9 +165,7 @@ export function ResourceCard({
             </span>
           )}
           <ReportBrokenLink resource={resource} className={styles.copyLinkBtn} />
-          <button type="button" className={styles.bookmark} aria-label={`Save ${resource.name}`}>
-            <Bookmark className="size-4" />
-          </button>
+          <BookmarkButton resourceId={resource.id} resourceName={resource.name} className={styles.bookmark} />
         </div>
       </div>
 

@@ -37,6 +37,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Next resolves "server-only" itself; outside Next it isn't installed.
+      // Point it at Next's empty stub so modules that import it can load.
+      'server-only': path.resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },
   },
 });

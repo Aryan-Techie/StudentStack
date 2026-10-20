@@ -8,6 +8,8 @@ import { COST_LABELS, DURATION_LABELS, VERIFICATION_LABELS } from "@/lib/resourc
 import { comparisonSetsForResource } from "@/lib/comparisons";
 import { SiteHeader } from "@/components/home/site-chrome";
 import { ClaimButton } from "@/components/resource/claim-button";
+import { BookmarksProvider } from "@/components/bookmarks/bookmarks-provider";
+import { BookmarkButton } from "@/components/bookmarks/bookmark-button";
 import { passFontVariables } from "@/lib/fonts";
 import homeStyles from "@/components/home/brand.module.css";
 import dirStyles from "@/components/directory/directory.module.css";
@@ -147,6 +149,13 @@ export default async function ResourcePage({
                   Varies by university or regional portal
                 </div>
               )}
+              <BookmarksProvider>
+                <BookmarkButton
+                  resourceId={resource.id}
+                  resourceName={resource.name}
+                  className="inline-grid size-9 place-items-center rounded-md border border-border/70 text-muted-foreground hover:text-foreground"
+                />
+              </BookmarksProvider>
               {verified ? <span className="text-xs text-muted-foreground">{verified}</span> : null}
             </div>
 
