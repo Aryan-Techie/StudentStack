@@ -29,7 +29,7 @@ Supabase project**. Do not commit `.env.local`, credentials, or exported user da
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public client API key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key for the admin creation script |
-| `ADMIN_EMAIL` | Account allowed into the admin dashboard |
+| `ADMIN_EMAIL` | Account(s) allowed into the admin dashboard, comma-separated |
 | `CRON_SECRET` | Authentication for the link-health cron endpoint |
 | `SUBMISSIONS_WEBHOOK_URL` | Optional webhook pinged when a student submits an offer; falls back to `LINK_HEALTH_WEBHOOK_URL` |
 | `RESEND_API_KEY` | Optional: Resend API key for the weekly digest email |
