@@ -10,6 +10,10 @@ import { SiteHeader } from "@/components/home/site-chrome";
 import { ClaimButton } from "@/components/resource/claim-button";
 import { BookmarksProvider } from "@/components/bookmarks/bookmarks-provider";
 import { BookmarkButton } from "@/components/bookmarks/bookmark-button";
+import { RatingStars } from "@/components/reviews/rating-stars";
+import { ReviewForm } from "@/components/reviews/review-form";
+import { getRatingSummary, getResourceReviews, type ReviewSort } from "@/lib/reviews";
+import { formatRating, type RatingSummary } from "@/lib/review-rules";
 import { passFontVariables } from "@/lib/fonts";
 import homeStyles from "@/components/home/brand.module.css";
 import dirStyles from "@/components/directory/directory.module.css";
@@ -71,7 +75,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function jsonLd(resource: Resource, canonical: string): string {
+function jsonLd(resource: Resource, canonical: string, rating: RatingSummary | null): string {
   const data = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -88,19 +92,37 @@ function jsonLd(resource: Resource, canonical: string): string {
       availability: resource.status === "active" ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       category: resource.categoryName,
     },
+    ...(rating
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: rating.average.toFixed(1),
+            reviewCount: rating.count,
+          },
+        }
+      : {}),
   };
   // Guard against `</script>` breaking out of the JSON-LD block.
   return JSON.stringify(data).replace(/<\//g, "<\\/");
 }
 
+const reviewDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
 export default async function ResourcePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ reviews?: string }>;
 }) {
   const { slug } = await params;
   const resource = await getResourceBySlug(slug);
   if (!resource) notFound();
+  const reviewSort: ReviewSort = (await searchParams).reviews === "highest" ? "highest" : "recent";
+  const [reviews, rating] = await Promise.all([
+    getResourceReviews(resource.id, reviewSort),
+    getRatingSummary(resource.id),
+  ]);
 
   const siteUrl = getSiteUrl();
   const canonical = `${siteUrl}/r/${resource.slug}`;
@@ -114,7 +136,7 @@ export default async function ResourcePage({
 
   return (
     <div className={`${passFontVariables} ${homeStyles.root}`}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(resource, canonical) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(resource, canonical, rating) }} />
       <SiteHeader total={allResources.length} />
       <div className={dirStyles.root}>
         <main className={dirStyles.wrap}>
@@ -213,6 +235,62 @@ export default async function ResourcePage({
                 </ul>
               </section>
             ) : null}
+
+            <section aria-labelledby="reviews-heading" className="mb-12">
+              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+                <h2 id="reviews-heading" className="text-xl font-semibold">
+                  Student reviews
+                </h2>
+                {rating ? (
+                  <span className="inline-flex items-center gap-2 text-sm">
+                    <RatingStars value={rating.average} />
+                    {formatRating(rating)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mb-6">
+                <ReviewForm resourceId={resource.id} slug={resource.slug} />
+              </div>
+              {reviews.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No reviews yet.</p>
+              ) : (
+                <>
+                  <nav aria-label="Sort reviews" className="mb-3 flex gap-3 text-sm">
+                    <Link
+                      href={`/r/${resource.slug}#reviews-heading`}
+                      aria-current={reviewSort === "recent" ? "true" : undefined}
+                      className={reviewSort === "recent" ? "font-semibold" : "text-muted-foreground hover:underline"}
+                    >
+                      Most recent
+                    </Link>
+                    <Link
+                      href={`/r/${resource.slug}?reviews=highest#reviews-heading`}
+                      aria-current={reviewSort === "highest" ? "true" : undefined}
+                      className={reviewSort === "highest" ? "font-semibold" : "text-muted-foreground hover:underline"}
+                    >
+                      Highest rated
+                    </Link>
+                  </nav>
+                  <ul className="flex flex-col gap-3">
+                    {reviews.map((review) => (
+                      <li key={review.id} className="rounded-lg border border-border/60 bg-card/50 p-4">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                          <RatingStars value={review.rating} />
+                          <span className="font-medium">Student</span>
+                          {review.verifiedStudent ? (
+                            <span className="rounded-full border border-emerald-300 px-2 py-0.5 text-xs text-emerald-800 dark:border-emerald-700 dark:text-emerald-300">
+                              Verified student
+                            </span>
+                          ) : null}
+                          <span className="text-xs text-muted-foreground">{reviewDate.format(review.createdAt)}</span>
+                        </div>
+                        {review.comment ? <p className="mt-2 whitespace-pre-line text-sm">{review.comment}</p> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
 
             {related.length > 0 ? (
               <section aria-labelledby="related-heading" className="mb-8">

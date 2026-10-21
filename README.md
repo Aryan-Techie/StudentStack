@@ -43,6 +43,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **"For you" sort** — signed-in students can set an optional branch and year at `/onboarding` (offered once after first sign-in, skippable, and linked from `/my-list`). The directory then defaults to a "For you" sort that ranks matching offers first; nothing is hidden.
 - **"Only what I'm eligible for"** — an accountless eligibility profile (country, state, degree level, year, field, and whether you have a college email, the GitHub Student Pack, or a student ID) set from the directory and saved in the browser. A toggle then hides offers you can't claim. Signed-in students get the profile synced across devices.
 - **Personal deadlines calendar** — signed-in students can get a private `/u/<token>/deadlines.ics` link from `/my-list` that subscribes Google Calendar, Apple Calendar, or Outlook to the deadlines of their saved offers. The link can be reset at any time.
+- **Student reviews and ratings** on each `/r/[slug]` page: students who saved an offer can leave a 1–5 star rating and an optional comment (one review per student per offer, editable). Reviews show as "Student" with a "Verified student" badge for academic emails, sort by most recent or highest rated, and directory cards show the average and count.
 
 ---
 
@@ -76,11 +77,14 @@ src/
 │   ├── onboarding/                        # Optional branch + year step for the "For you" sort
 │   ├── api/profile/route.ts               # Signed-in student's branch/year (GET)
 │   ├── u/[token]/deadlines.ics/route.ts   # Per-user calendar feed of saved deadlines (token in URL)
+│   ├── reviews/actions.ts                 # Submit/delete review Server Actions
+│   ├── api/reviews/route.ts               # Signed-in student's own review + whether they can review
 │   └── api/cron/link-health/route.ts      # Weekly link-health check
 ├── components/
 │   ├── directory/                         # Search, filters, cards, loading UI
 │   ├── admin/                             # Resource create/edit form
 │   ├── home/                              # Student Pass card, category wallet
+│   ├── reviews/                           # Star rating display + review form
 │   └── ui/                                # Reusable interface primitives
 ├── db/
 │   ├── index.ts                           # Postgres/Drizzle connection
@@ -90,6 +94,8 @@ src/
 │   ├── comparisons.ts                     # Hand-picked comparison sets for /compare
 │   ├── resource-labels.ts                 # Shared cost, verification, and duration labels
 │   ├── link-health.ts                     # URL health-check logic
+│   ├── reviews.ts                         # Review queries and rating aggregates
+│   ├── review-rules.ts                    # Review validation, academic-email check, rating format
 │   ├── admin/auth.ts                      # Admin session verification
 │   ├── supabase/                          # Supabase client helpers (browser + server)
 │   └── ingestion/                         # Resource ingestion pipeline
@@ -277,7 +283,7 @@ Any platform that supports Node.js 20+ and can run `pnpm build && pnpm start` wi
 
 ## Current Scope
 
-The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`. The schema already includes tables for reviews and click events, but those flows aren't exposed in the UI yet — they're planned for a future phase that extends the existing Supabase Auth setup to real user accounts. Multi-admin roles remain out of scope for now.
+The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`, and student reviews and ratings (issue #37) on resource pages and directory cards. Click events are recorded but only surface as the homepage's "Popular this week". Multi-admin roles remain out of scope for now.
 
 ---
 

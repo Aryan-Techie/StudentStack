@@ -65,6 +65,8 @@ export type Resource = {
   // the opportunity is open on that axis.
   opensAt?: number | null;
   eligibility?: ResourceEligibility | null;
+  // Review aggregate (issue #37), merged in by pages that show ratings.
+  rating?: { average: number; count: number } | null;
   status: "active" | "expired" | "broken";
   lastVerifiedAt: number | null;
 };

@@ -792,6 +792,19 @@ details[open] > summary .chevronIcon {
   outline-offset: 1px;
 }
 
+.ratingRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--d-muted);
+  text-decoration: none;
+}
+
+.ratingRow:hover {
+  color: var(--d-ink);
+}
+
 .offerTitle {
   font-weight: 700;
   font-size: 0.98rem;
