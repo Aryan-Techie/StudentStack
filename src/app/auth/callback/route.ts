@@ -2,6 +2,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNextPath } from "@/lib/auth-redirect";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/profiles";
 
 // Students land here after signing in:
 // - ?code=        Google sign-in, or an email link opened in the same browser
@@ -32,6 +33,20 @@ export async function GET(request: NextRequest) {
   if (failed) {
     const back = new URL(next, origin).pathname;
     return NextResponse.redirect(`${origin}${back}?error=link`);
+  }
+
+  // First sign-in: offer the optional branch + year step (issue #34) before
+  // continuing. A profile lookup failure never blocks signing in.
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const profile = user ? await getProfile(user.id) : null;
+    if (user && !profile?.completedOnboarding) {
+      return NextResponse.redirect(`${origin}/onboarding?next=${encodeURIComponent(next)}`);
+    }
+  } catch (error) {
+    console.warn("[auth] onboarding check failed:", error instanceof Error ? error.message : error);
   }
   return NextResponse.redirect(`${origin}${next}`);
 }

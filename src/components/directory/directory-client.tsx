@@ -13,7 +13,11 @@ import { ResourceCard } from "./resource-card";
 import { ShortcutsHelp } from "./shortcuts-help";
 import { FilterAnnouncer } from "./filter-announcer";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { hasSignals, sortForYou } from "@/lib/personalization";
+import { useProfileSignals } from "./use-profile-signals";
 import styles from "./directory.module.css";
+
+type SortMode = "for-you" | "recommended" | "name" | "recent" | "free-first";
 
 const PAGE_SIZE = 30;
 const STORAGE_KEY = "studentstack:last-filters";
@@ -147,7 +151,11 @@ export function DirectoryClient({
   );
 const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-const [sort, setSort] = useState<"recommended" | "name" | "recent" | "free-first">("recommended");
+// null = not chosen yet: "For you" when the student has a branch/year
+// profile (issue #34), otherwise "Recommended".
+const [sortChoice, setSortChoice] = useState<SortMode | null>(null);
+const profile = useProfileSignals();
+const sort: SortMode = sortChoice ?? (hasSignals(profile) ? "for-you" : "recommended");
 const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 const [shortcutsOpen, setShortcutsOpen] = useState(false);
 const searchInputRef = useRef<HTMLInputElement>(null);
@@ -279,11 +287,15 @@ const searchInputRef = useRef<HTMLInputElement>(null);
         );
       });
     }
+    if (sort === "for-you" && hasSignals(profile)) {
+      // Ranking boost only: every filtered resource stays in the list.
+      return demoteBroken(sortForYou(result, profile));
+    }
     // Default directory ordering (and search relevance): demote broken
     // links and expired offers below active ones (issue #76). Stable sort
     // keeps relevance order within each status group.
     return demoteBroken(result);
-  }, [resources, filters, fuse, sort]);
+  }, [resources, filters, fuse, sort, profile]);
 
   const categoryCounts = useMemo(
     () => countByCategory(applyFilters(resources, filters, fuse, "category")),
@@ -733,10 +745,11 @@ useKeyboardShortcuts({
             <select
               id="sort-select"
               value={sort}
-              onChange={(e) => setSort(e.target.value as "recommended" | "name" | "recent" | "free-first")}
+              onChange={(e) => setSortChoice(e.target.value as SortMode)}
               aria-label="Sort offers"
               className={styles.sort}
             >
+              {hasSignals(profile) && <option value="for-you">For you</option>}
               <option value="recommended">Recommended</option>
               <option value="name">Name A-Z</option>
               <option value="recent">Recently verified</option>

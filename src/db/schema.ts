@@ -125,6 +125,18 @@ export const bookmarks = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.resourceId] })],
 ).enableRLS();
 
+// Per-student profile (issue #34), keyed by the Supabase auth user id.
+// Branch and year are optional and only ever boost ranking ("For you"
+// sort), never filter anything out.
+export const profiles = pgTable("profiles", {
+  userId: uuid("user_id").primaryKey(),
+  branch: text("branch"),
+  year: integer("year"),
+  completedOnboarding: boolean("completed_onboarding").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}).enableRLS();
+
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   resourceId: integer("resource_id")

@@ -40,6 +40,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Side-by-side comparisons** at `/compare` — hand-picked sets of overlapping offers (cloud credits, AI coding assistants, design tools) shown as one table: what you get, cost type, verification, credit card, duration, region, platforms, and claim link. Resource pages link to every set they appear in.
 - **Duplicate-aware submissions** — `/submit` rejects a link that is already listed or waiting for review, even when it differs only by `http`/`https`, a leading `www.`, letter case, a `#fragment`, or a trailing slash. An optional webhook (`SUBMISSIONS_WEBHOOK_URL`) pings the admin when a new submission arrives.
 - **Bookmarks and application tracker** — the bookmark icon on every directory card and on `/r/[slug]` saves an offer to `/my-list`, where students track each one as Interested, Applied, Got it, or Rejected. Signed-out students are sent to sign in (same Google / email-link flow as `/submit`) and the offer is saved when they come back.
+- **"For you" sort** — signed-in students can set an optional branch and year at `/onboarding` (offered once after first sign-in, skippable, and linked from `/my-list`). The directory then defaults to a "For you" sort that ranks matching offers first; nothing is hidden.
 
 ---
 
@@ -70,6 +71,8 @@ src/
 │   ├── compare/                           # /compare index and /compare/[set] side-by-side tables
 │   ├── my-list/                           # Saved offers + application tracker (sign-in required)
 │   ├── api/bookmarks/route.ts             # Signed-in student's bookmark statuses (used by cards)
+│   ├── onboarding/                        # Optional branch + year step for the "For you" sort
+│   ├── api/profile/route.ts               # Signed-in student's branch/year (GET)
 │   └── api/cron/link-health/route.ts      # Weekly link-health check
 ├── components/
 │   ├── directory/                         # Search, filters, cards, loading UI
@@ -172,6 +175,8 @@ Open [http://localhost:3000](http://localhost:3000).
 3. Combine category, region, cost, and tag filters as needed.
 4. Use the filter chips to remove individual selections, or choose **Clear all**.
 5. Open a resource's official claim link when one is available. Region-dependent offers are labelled "Varies by region" when no single static link exists.
+
+Signed-in students who have set a branch or year at `/onboarding` get an extra **For you** option in the sort menu, selected by default. It moves offers tagged for their branch (for example MATLAB and KiCad for ECE, Figma and Canva for Design) and opportunities whose minimum year of study they have reached to the top, and keeps everything else in the usual order below.
 
 Filter state lives in the URL, so any search can be shared or bookmarked as-is:
 
