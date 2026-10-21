@@ -260,6 +260,9 @@ Schema changes are tracked as migrations under [`drizzle/`](drizzle). `0000_base
 | Apify actors (only when `APIFY_TOKEN` is set) | Scholarships, hackathons, Unstop listings, and flagship Internshala internships |
 
 GitHub sources report the latest commit SHA of their file (using `GITHUB_TOKEN` when set), and a source whose fingerprint hasn't changed since the last run is skipped without downloading. Each source's last fingerprint, status, error, and counts are stored in the `ingestion_sources` table (migration `drizzle/0007_ingestion_sources.sql`); a failed run keeps the old fingerprint so the next run retries. Candidates whose deadline has already passed are dropped and counted as `expired` in the run summary.
+### Ingestion review
+
+`/admin/ingestion` is where candidates from the ingestion cron (`/api/cron/ingest-resources`) get approved or rejected. It shows a **Sources** table with each source's health (healthy, failing, stale after 14 days without a successful run, or not run yet), last run, last success, fetched/queued counts, and pending count, with a filter and a one-click "Reject all" per source. Candidates are deduplicated before they're queued: link variants of a listed offer (http/https, `www.`, fragments, trailing slashes) and same-name-same-site entries are dropped; close names, or a different page on the same offer-specific host, are queued as possible duplicates next to the matched resource; and an offer listed by two sources is queued once. A set of official vendor student pages (AWS, Azure, Google Cloud, Figma, Adobe Creative Cloud, Microsoft 365) is also watched: when a page's offer text changes, it's queued next to the listed resource so the listing can be updated.
 
 ---
 

@@ -370,6 +370,33 @@ left to #104.
   opportunity feeds move faster than perks. Both existing crons now reject
   requests when `CRON_SECRET` is unset (`Bearer undefined` used to pass).
   The inline `run-ingestion.ts` self-check moved to vitest.
+## Issue #40 — Completing the ingestion pipeline
+
+- **Dedup** (`src/lib/ingestion/classify-match.ts`): exact-URL matching now uses
+  `urlMatchKey()` from `/submit`'s duplicate check, so link variants of a listed
+  offer are dropped. Identical normalized names on the same host are also
+  dropped. A different page on the same host counts as a possible duplicate,
+  except on shared hosts (github.com, devpost.com, unstop.com, …) where a
+  shared host says nothing about whether two offers are the same.
+  `runIngestion` also drops candidates whose link is already pending from any
+  source, or queued earlier in the same run.
+- **Vendor page watching** (`src/lib/ingestion/sources/vendor-watch.ts`):
+  judgment call. Cloud and tool vendors don't publish feeds, and scraping their
+  marketing pages into new rows would mostly re-create offers we already list.
+  So each watched page is fingerprinted by its offer sentences only (money,
+  credits, plans, durations), and a changed fingerprint queues one candidate
+  next to the existing resource (`updateOf`). The first run only records a
+  baseline (`baselineFirstRun`), so turning this on doesn't flood the queue.
+  Six pages are watched. Fingerprints were checked against live pages and
+  are stable across fetches; lines with trace ids, long tokens, or times are
+  excluded so per-request noise can't trigger a review. Oracle Cloud, Canva,
+  and Autodesk return 403 to automated requests and JetBrains renders its
+  offer client-side, so those aren't watched.
+- **Source health** reads the `ingestion_sources` table added in #83; "stale"
+  means no successful run in 14 days.
+- Sources are now built per cron run (`getSources()`), because the vendor
+  watcher caches its page fetch for one run and a module-level array would
+  have kept that cache across runs on a warm instance.
 
 ## Status: Phase 2 (PRD §13) — done
 
