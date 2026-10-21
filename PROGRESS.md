@@ -40,6 +40,43 @@ in the same `resources` table as software perks.
 5. **Deadline bug fixed on the way.** The edit form's deadline input had
    no default value, so saving any resource silently cleared its deadline.
    It now pre-fills.
+## Issue #36 — Compare view
+
+Side-by-side tables for offers that overlap (PRD §8.9).
+
+- **Sets are content, not user-built.** `src/lib/comparisons.ts` holds
+  three hand-picked sets (`cloud-credits`, `ai-coding-assistants`,
+  `design-tools`): a slug, a name, a description, and an ordered list of
+  resource slugs from `offers.json`. More sets get added there.
+- **`/compare/[set]`** renders one table: what you get, cost type,
+  verification, credit card, duration, region, platforms, and a claim
+  link. Unknown sets 404. **`/compare`** lists every set.
+- **Links in.** `/r/[slug]` shows "Compare side by side" when the
+  resource is in a set; "Compare" is in the header, mobile menu, and
+  footer; the sitemap lists every compare page.
+- `getResourcesForSlugs()` in `src/lib/resources.ts` fetches approved
+  rows only, with a mock-data fallback.
+
+### Judgment calls (#36)
+
+1. **Missing slugs are skipped, not errors.** If an offer is removed or
+   unapproved, its set still renders with the rest; an empty set shows
+   "No offers in this comparison are live right now."
+2. **Rendered per request** (`force-dynamic`), like `/r/[slug]`, so
+   admin edits and link-health flips show up immediately.
+3. **Shared labels.** The cost, verification, and duration label maps
+   moved out of `/r/[slug]` into `src/lib/resource-labels.ts` so both
+   pages say the same thing.
+4. **Sticky offer column, sideways scroll.** The table keeps a 720px
+   minimum width and scrolls horizontally on phones rather than
+   collapsing into cards, so the columns stay comparable.
+5. **Directory theme tokens.** The table and cards use the directory's
+   `--d-*` variables instead of the global `bg-background`/`bg-card`
+   tokens, which don't follow the directory's dark palette and left the
+   offer column unreadable.
+6. **Footer links wrap.** Adding "Compare" pushed the footer nav toward
+   the edge at 390px, so footer links now wrap on narrow screens. The
+   header nav is unchanged.
 
 ## Status: Phase 2 (PRD §13) — done
 

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAllResourceSlugs } from "@/lib/resources";
 import { getSiteUrl } from "@/lib/site";
 import { PRESETS } from "@/lib/presets";
+import { COMPARISON_SETS } from "@/lib/comparisons";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl();
@@ -14,6 +15,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/deadlines`, lastModified: now },
     ...PRESETS.map((p) => ({
       url: `${siteUrl}/${p.slug}`,
+      lastModified: now,
+    })),
+    { url: `${siteUrl}/compare`, lastModified: now },
+    ...COMPARISON_SETS.map((set) => ({
+      url: `${siteUrl}/compare/${set.slug}`,
       lastModified: now,
     })),
     // Per-resource SEO pages — approved resources only.

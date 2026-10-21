@@ -37,6 +37,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Responsive UI** designed for students browsing primarily on mobile.
 - **Opportunities alongside perks** — each resource has a `kind` (`perk`, `scholarship`, `fellowship`, `internship`, `mentorship`, `program`) plus optional opens-at date, deadline, recurrence, amount, provider, and structured eligibility, all editable in `/admin`.
 - **Student submission flow** at `/submit` (Google or email-link sign-in via Supabase Auth); submissions stay hidden until approved from the review queue in `/admin`.
+- **Side-by-side comparisons** at `/compare` — hand-picked sets of overlapping offers (cloud credits, AI coding assistants, design tools) shown as one table: what you get, cost type, verification, credit card, duration, region, platforms, and claim link. Resource pages link to every set they appear in.
 
 ---
 
@@ -64,6 +65,7 @@ src/
 │   ├── directory/page.tsx                 # Directory route with search & filters
 │   ├── admin/                             # Login + dashboard (Supabase Auth-gated)
 │   ├── submit/                            # Student submission flow
+│   ├── compare/                           # /compare index and /compare/[set] side-by-side tables
 │   └── api/cron/link-health/route.ts      # Weekly link-health check
 ├── components/
 │   ├── directory/                         # Search, filters, cards, loading UI
@@ -75,6 +77,8 @@ src/
 │   └── schema.ts                          # Drizzle schema (categories, resources, bookmarks, reviews, click events)
 ├── lib/
 │   ├── resources.ts                       # Resource and category queries
+│   ├── comparisons.ts                     # Hand-picked comparison sets for /compare
+│   ├── resource-labels.ts                 # Shared cost, verification, and duration labels
 │   ├── link-health.ts                     # URL health-check logic
 │   ├── admin/auth.ts                      # Admin session verification
 │   ├── supabase/                          # Supabase client helpers (browser + server)
@@ -169,6 +173,8 @@ Filter state lives in the URL, so any search can be shared or bookmarked as-is:
 ```text
 /directory?q=github&category=development-tools&region=Global&cost=free
 ```
+
+To weigh similar offers against each other, open **Compare** in the header (or **Compare side by side** on a resource page). Each set at `/compare/<set>` lists its offers in one table; on a phone the offer column stays pinned while the table scrolls sideways. Sets are defined in [`src/lib/comparisons.ts`](src/lib/comparisons.ts) as an ordered list of resource slugs; a slug with no approved resource is skipped, so a set keeps working if an offer is removed. Add a new set there to publish it — it is picked up by the index, the resource pages, and the sitemap.
 
 ---
 
