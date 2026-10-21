@@ -16,6 +16,7 @@ import {
   type SortOption,
 } from "./directory-filters";
 import type { Resource } from "./resources";
+import { isEligible, parseEligibilityProfile, type EligibilityProfile } from "@/lib/eligibility";
 
 const sampleResources: Resource[] = [
   {
@@ -588,5 +589,71 @@ describe("self check block execution", () => {
     } finally {
       process.argv[1] = originalArgv;
     }
+  });
+});
+
+// Issue #84: "Only what I'm eligible for".
+
+describe("isEligible", () => {
+  const base = {
+    verificationNeeded: null,
+    region: "Global" as const,
+    regions: [] as string[],
+    regionLocked: false,
+    eligibility: null,
+  };
+  const indian: EligibilityProfile = { country: "IN" };
+
+  it("treats unrestricted resources as open to everyone", () => {
+    expect(isEligible(base, indian)).toBe(true);
+    expect(isEligible(base, { country: "US" })).toBe(true);
+  });
+
+  it("requires the matching verification method", () => {
+    const edu = { ...base, verificationNeeded: "edu_email" as const };
+    expect(isEligible(edu, indian)).toBe(false);
+    expect(isEligible(edu, { ...indian, hasEduEmail: true })).toBe(true);
+    const pack = { ...base, verificationNeeded: "github_student_pack" as const };
+    expect(isEligible(pack, { ...indian, hasEduEmail: true })).toBe(false);
+    expect(isEligible(pack, { ...indian, hasGithubPack: true })).toBe(true);
+    expect(isEligible({ ...base, verificationNeeded: "none" as const }, indian)).toBe(true);
+  });
+
+  it("matches region availability against the student's country", () => {
+    const usOnly = { ...base, regions: ["US"], regionLocked: true };
+    expect(isEligible(usOnly, indian)).toBe(false);
+    expect(isEligible(usOnly, { country: "US" })).toBe(true);
+    const indiaOnly = { ...base, region: "IN" as const, regions: ["IN"], regionLocked: true };
+    expect(isEligible(indiaOnly, indian)).toBe(true);
+    expect(isEligible(indiaOnly, { country: "US" })).toBe(false);
+  });
+
+  it("applies structured eligibility rules only when both sides are set", () => {
+    const pgInKerala = {
+      ...base,
+      eligibility: { levels: ["PG" as const], countries: ["IN"], states: ["Kerala"], minYear: 2, fields: ["CS", "ECE"] },
+    };
+    expect(isEligible(pgInKerala, indian)).toBe(true); // nothing to compare yet
+    expect(isEligible(pgInKerala, { ...indian, level: "UG" })).toBe(false);
+    expect(isEligible(pgInKerala, { ...indian, level: "PG", state: "kerala" })).toBe(true);
+    expect(isEligible(pgInKerala, { ...indian, state: "Goa" })).toBe(false);
+    expect(isEligible(pgInKerala, { ...indian, year: 1 })).toBe(false);
+    expect(isEligible(pgInKerala, { ...indian, field: "CSE" })).toBe(true);
+    expect(isEligible(pgInKerala, { ...indian, field: "Mechanical" })).toBe(false);
+    expect(isEligible(pgInKerala, { country: "US" })).toBe(false);
+  });
+});
+
+describe("parseEligibilityProfile", () => {
+  it("rejects non-objects and defaults the country to IN", () => {
+    expect(parseEligibilityProfile(null)).toBeNull();
+    expect(parseEligibilityProfile("x")).toBeNull();
+    expect(parseEligibilityProfile({})).toEqual({ country: "IN" });
+  });
+
+  it("keeps valid fields and drops invalid ones", () => {
+    expect(
+      parseEligibilityProfile({ country: "us", level: "PhD", year: 9, field: "ECE", hasEduEmail: true, hasStudentId: "yes" }),
+    ).toEqual({ country: "US", level: "PhD", field: "ECE", hasEduEmail: true });
   });
 });

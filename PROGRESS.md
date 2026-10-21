@@ -190,6 +190,56 @@ visible.
    fails, the student goes straight to `next`.
 5. **The profile is fetched client-side.** The server-rendered directory
    is identical for every visitor; only `/api/profile` is per-user.
+## Issue #84 — Accountless eligibility profile and personal calendar
+
+Students can say what they're eligible for without signing up, and the
+directory can hide what they can't claim. Signed-in students also get a
+private calendar feed of their saved deadlines.
+
+- **Eligibility sheet.** "Set my eligibility" in `/directory` opens a
+  dialog (`src/components/directory/eligibility-sheet.tsx`): country,
+  state (India only), degree level, year, branch/field, and three "I have"
+  checkboxes (college email, GitHub Student Pack, student ID). Saved to
+  `localStorage` under `studentstack:eligibility:v1`; the switch state
+  under `studentstack:eligible-only:v1`.
+- **"Only what I'm eligible for".** The switch narrows the resource pool
+  before every filter, facet count, and search runs, so the counts match
+  what's shown. Turning it on with no profile opens the sheet first.
+  Matching is `isEligible()` in `src/lib/eligibility.ts`: verification
+  method, region (India uses the existing `worksInIndia` rule), and the
+  structured eligibility from #78.
+- **Sync.** `useViewerProfile()` replaces #34's `useProfileSignals()` and
+  makes one `/api/profile` call, which now also returns `eligibility`. When
+  signed in, a local profile is pushed to `profiles` (server action
+  `syncEligibility`); with no local copy, the saved one is pulled down. Field
+  and year share #34's `branch`/`year` columns, so onboarding and the sheet
+  stay in step. Signed-out students who fill in field or year also get the
+  "For you" sort.
+- **Personal calendar.** `/my-list` has a "Deadlines in your calendar"
+  section with "Get my calendar link", a `webcal:` Subscribe link, and
+  "Reset link". The feed is `/u/[token]/deadlines.ics`: the student's
+  bookmarked, approved resources that have a deadline, built with the
+  existing `buildIcsFeed` under the calendar name "My StudentStack
+  deadlines".
+- **Schema.** `profiles` gains `eligibility` (`jsonb`) and `calendar_token`
+  (`text`, unique). Migration `drizzle/0003_profile_eligibility.sql`.
+
+### Judgment calls (#84)
+
+1. **localStorage first.** The profile works with no account, and the
+   local copy wins over the server one when both exist, since it's what
+   the student just edited on this device.
+2. **A blank answer never excludes.** A rule only removes a resource when
+   both the resource and the profile have a value for it. Resources whose
+   verification method hasn't been reviewed count as eligible.
+3. **The token is the credential.** Calendar apps can't send cookies, so
+   the feed URL carries 32 random bytes (base64url). Malformed tokens get a
+   404 before any database lookup, responses are `Cache-Control: private`
+   and `X-Robots-Tag: noindex`, and "Reset link" issues a new token so an
+   old leaked link stops working.
+4. **Free-text fields are normalized.** Admins type eligibility fields as
+   "CS", "Computer Science", "ECE"…; profiles use the #34 branch codes.
+   Both sides map to a shared canonical code before comparing.
 
 ## Status: Phase 2 (PRD §13) — done
 

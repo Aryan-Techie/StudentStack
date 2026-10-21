@@ -133,6 +133,20 @@ export const profiles = pgTable("profiles", {
   branch: text("branch"),
   year: integer("year"),
   completedOnboarding: boolean("completed_onboarding").notNull().default(false),
+  // Synced copy of the accountless eligibility profile (issue #84): country,
+  // state, degree level, and verification methods. Branch and year live in
+  // the columns above.
+  eligibility: jsonb("eligibility").$type<{
+    country?: string;
+    state?: string;
+    level?: string;
+    hasEduEmail?: boolean;
+    hasGithubPack?: boolean;
+    hasStudentId?: boolean;
+  }>(),
+  // Secret for the per-user /u/[token]/deadlines.ics feed (issue #84).
+  // Calendar apps can't send cookies, so the URL itself is the credential.
+  calendarToken: text("calendar_token").unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }).enableRLS();

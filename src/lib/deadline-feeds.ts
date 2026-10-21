@@ -98,7 +98,7 @@ function icsEvent(r: Resource, origin: string, dtstamp: string): string {
 // subscribe once and get the whole deadline calendar.
 export function buildIcsFeed(
   resources: Resource[],
-  opts: { origin?: string; nowMs?: number } = {},
+  opts: { origin?: string; nowMs?: number; calendarName?: string } = {},
 ): string {
   const origin = opts.origin ?? siteUrl();
   const dtstamp = icsDateTime(opts.nowMs ?? Date.now());
@@ -111,7 +111,7 @@ export function buildIcsFeed(
     "PRODID:-//StudentStack//Deadlines//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "X-WR-CALNAME:StudentStack Deadlines",
+    `X-WR-CALNAME:${escapeIcsText(opts.calendarName ?? "StudentStack Deadlines")}`,
   ].map(foldIcsLine);
   const events = withDeadlines.map((r) => icsEvent(r, origin, dtstamp));
   return [...head, ...events, "END:VCALENDAR"].join("\r\n") + "\r\n";
