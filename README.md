@@ -46,6 +46,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Student reviews and ratings** on each `/r/[slug]` page: students who saved an offer can leave a 1–5 star rating and an optional comment (one review per student per offer, editable). Reviews show as "Student" with a "Verified student" badge for academic emails, sort by most recent or highest rated, and directory cards show the average and count.
 - **Public read API and agent docs**: `GET /api/resources` (filters for `kind`, `category`, `region`, `deadline_before`) and `GET /api/resources/{slug}`, cached at the CDN and rate limited per client. `/api-docs` documents them with `curl` examples and `/llms.txt` gives AI agents a map of the site; both are linked from the footer.
 - **Community credits**: cards and resource pages show "N students got this" (an aggregate count only), and `/submit` has an optional "Credit me as" field shown as "Added by …" once a submission is approved.
+- **Weekly digest email** sent with [Resend](https://resend.com/) every Friday: offers added that week plus deadlines closing in the next 7 days. On by default for signed-in students, with a signed one-click unsubscribe link and an on/off toggle on `/my-list`.
 
 ---
 
@@ -64,6 +65,7 @@ offers.json → scripts/normalize-data.ts → scripts/seed.ts → Supabase Postg
 | **Database** | Postgres via your own [Supabase](https://supabase.com/) project, queried with [Drizzle ORM](https://orm.drizzle.team/) |
 | **Auth** | Supabase Auth, gating `/admin` behind a single allow-listed email (`ADMIN_EMAIL`) |
 | **Scheduled Jobs** | [Vercel Cron](https://vercel.com/docs/cron-jobs) triggers `/api/cron/link-health` every Monday 03:00 UTC |
+| **Email** | [Resend](https://resend.com/) HTTP API sends the weekly digest from `/api/cron/weekly-digest` every Friday 03:30 UTC |
 | **Client-Side Search** | [Fuse.js](https://www.fusejs.io/) fuzzy-matches across name, offer, description, and tags |
 
 ```text
@@ -86,6 +88,9 @@ src/
 │   ├── api/resources/route.ts             # Public list API with filters, cache, rate limit
 │   ├── api/resources/[id]/route.ts        # Public single-resource API (segment holds the slug)
 │   └── api/cron/link-health/route.ts      # Weekly link-health check
+│   ├── api/cron/weekly-digest/route.ts    # Weekly digest email (Fridays)
+│   ├── api/digest/unsubscribe/route.ts    # RFC 8058 one-click unsubscribe (POST)
+│   └── digest/unsubscribe/page.tsx        # Unsubscribe confirmation page
 ├── components/
 │   ├── directory/                         # Search, filters, cards, loading UI
 │   ├── admin/                             # Resource create/edit form
@@ -105,6 +110,9 @@ src/
 │   ├── api-filters.ts                     # Public API filter parsing and matching
 │   ├── rate-limit.ts                      # In-memory per-instance API rate limiter
 │   ├── llms-txt.ts                        # Builds the /llms.txt body
+│   ├── digest.ts                          # Digest email body and signed unsubscribe links
+│   ├── digest-data.ts                     # Digest content and recipient queries
+│   ├── email.ts                           # Resend batch sending
 │   ├── admin/auth.ts                      # Admin session verification
 │   ├── supabase/                          # Supabase client helpers (browser + server)
 │   └── ingestion/                         # Resource ingestion pipeline
@@ -155,6 +163,9 @@ SUPABASE_SERVICE_ROLE_KEY= # server-only, used by scripts/create-admin.ts
 ADMIN_EMAIL=               # the one account allowed into /admin
 CRON_SECRET=               # Vercel Cron sends this as a Bearer token
 SUBMISSIONS_WEBHOOK_URL=   # optional: Slack/JSON webhook pinged on each new /submit entry; falls back to LINK_HEALTH_WEBHOOK_URL
+RESEND_API_KEY=            # optional: Resend API key for the weekly digest (set by the Vercel Resend integration)
+DIGEST_FROM_EMAIL=         # optional: verified digest sender, e.g. "StudentStack <digest@yourdomain>"
+DIGEST_SECRET=             # optional: signs digest unsubscribe links (defaults to CRON_SECRET)
 ```
 
 ### 3. Install, Migrate, and Seed
@@ -249,6 +260,11 @@ curl "http://localhost:3000/api/resources/github-copilot"
 - `GET /api/resources` takes `page`, `limit` (max 100), `kind` (comma-separated), `category` (slug), `region` (`IN` or `Global`), and `deadline_before` (ISO date). Invalid values return `400` naming the parameter.
 - `GET /api/resources/{slug}` returns one approved resource or `404`.
 - Responses send `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. Each client IP gets 60 requests per minute per function instance (`429` with `Retry-After` past that, plus `X-RateLimit-Limit` / `X-RateLimit-Remaining` headers).
+## Weekly Digest
+
+`GET /api/cron/weekly-digest`, triggered by Vercel Cron every Friday at 03:30 UTC (09:00 IST), emails every Supabase Auth user with a confirmed email two lists: approved, active resources added in the last 7 days, and approved, active resources whose deadline falls in the next 7 days (up to 10 each). Nothing is sent when both lists are empty. The route requires a `Bearer ${CRON_SECRET}` header and returns `{ skipped: … }` until `RESEND_API_KEY` and `DIGEST_FROM_EMAIL` are set. Reading the recipient list uses `SUPABASE_SERVICE_ROLE_KEY`.
+
+Every email links to `/digest/unsubscribe`, which asks for a button click before turning the digest off, so email link scanners can't unsubscribe anyone. The link carries an HMAC of the user id signed with `DIGEST_SECRET` (or `CRON_SECRET`). Emails also send RFC 8058 `List-Unsubscribe` headers pointing at `POST /api/digest/unsubscribe` for mail providers' own unsubscribe buttons. Signed-in students can turn the digest on or off from `/my-list`. The preference is stored in `profiles.email_digest` (migration `drizzle/0006_email_digest.sql`).
 
 ---
 
@@ -301,6 +317,7 @@ The directory, preset pages, and admin still use the earlier token set in `src/a
 Any platform that supports Node.js 20+ and can run `pnpm build && pnpm start` will work. Ensure you:
 - Set all required environment variables
 - Configure a cron/scheduler to hit `/api/cron/link-health` weekly with the `CRON_SECRET` Bearer token
+- Configure a cron/scheduler to hit `/api/cron/weekly-digest` every Friday with the same Bearer token if you use the weekly digest
 - Run `pnpm db:push` and `pnpm db:seed` against your Supabase project before deploying
 
 ---

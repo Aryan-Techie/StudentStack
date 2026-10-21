@@ -8,7 +8,7 @@ import { getProfile } from "@/lib/profiles";
 import { getSiteUrl } from "@/lib/site";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { signOut } from "../submit/actions";
-import { enableCalendarFeed, resetCalendarFeed } from "./actions";
+import { enableCalendarFeed, resetCalendarFeed, setDigestPreference } from "./actions";
 import { SignInPanel } from "../submit/sign-in-panel";
 import { MyListClient } from "./my-list-client";
 import { PendingSave } from "./pending-save";
@@ -104,6 +104,22 @@ export default async function MyListPage({
             savedAt: item.savedAt.getTime(),
           }))}
         />
+        <section aria-labelledby="digest-heading" className="pb-10">
+          <h2 id="digest-heading" className={styles.sectionTitle}>
+            Weekly digest email
+          </h2>
+          <p className={styles.hint}>
+            Once a week: offers added that week and deadlines closing in the next 7 days. It is{" "}
+            <strong>{profile?.emailDigest === false ? "off" : "on"}</strong>.
+          </p>
+          <form action={setDigestPreference} className="mt-2">
+            <input type="hidden" name="enabled" value={profile?.emailDigest === false ? "true" : "false"} />
+            <button type="submit" className={styles.linkButton}>
+              {profile?.emailDigest === false ? "Turn it on" : "Turn it off"}
+            </button>
+          </form>
+        </section>
+
         <section aria-labelledby="calendar-heading" className="pb-16">
           <h2 id="calendar-heading" className={styles.sectionTitle}>
             Deadlines in your calendar

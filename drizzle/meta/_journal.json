@@ -43,6 +43,13 @@
       "when": 1792522118370,
       "tag": "0005_contributor_credit",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792522298156,
+      "tag": "0006_email_digest",
+      "breakpoints": true
     }
   ]
 }

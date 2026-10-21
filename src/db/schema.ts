@@ -151,6 +151,9 @@ export const profiles = pgTable("profiles", {
   // Secret for the per-user /u/[token]/deadlines.ics feed (issue #84).
   // Calendar apps can't send cookies, so the URL itself is the credential.
   calendarToken: text("calendar_token").unique(),
+  // Weekly digest email (issue #38). On by default; one-click unsubscribe
+  // in every email turns it off.
+  emailDigest: boolean("email_digest").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }).enableRLS();

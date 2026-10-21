@@ -91,3 +91,19 @@ export async function getUserIdByCalendarToken(token: string): Promise<string | 
     .limit(1);
   return row?.userId ?? null;
 }
+
+// Weekly digest preference (issue #38).
+export async function setEmailDigest(userId: string, enabled: boolean): Promise<void> {
+  await db
+    .insert(schema.profiles)
+    .values({ userId, emailDigest: enabled })
+    .onConflictDoUpdate({ target: schema.profiles.userId, set: { emailDigest: enabled, updatedAt: new Date() } });
+}
+
+export async function getDigestOptOuts(): Promise<Set<string>> {
+  const rows = await db
+    .select({ userId: schema.profiles.userId })
+    .from(schema.profiles)
+    .where(eq(schema.profiles.emailDigest, false));
+  return new Set(rows.map((r) => r.userId));
+}
