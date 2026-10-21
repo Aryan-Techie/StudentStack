@@ -2,8 +2,10 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { MOCK_CATEGORIES, MOCK_RESOURCES } from "./mock-data";
 import { normalizePagination, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./pagination";
+import type { ResourceEligibility } from "@/db/schema";
 
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE };
+export type { ResourceEligibility };
 
 function hasDatabase(): boolean {
   return Boolean(process.env.POSTGRES_URL);
@@ -54,9 +56,14 @@ export type Resource = {
   // predate them. `amount` is the prize/value line ("$5,000", "Full tuition"),
   // `provider` the organization behind the offer, and `recurrence` the cycle
   // label shown on past items ("Feb" → "Opens again ~Feb").
-  amount?: string;
-  provider?: string;
-  recurrence?: string;
+  amount?: string | null;
+  provider?: string | null;
+  recurrence?: string | null;
+  // Opportunity schema (issue #78): when the application window opens
+  // (epoch ms) and structured eligibility. Unset eligibility fields mean
+  // the opportunity is open on that axis.
+  opensAt?: number | null;
+  eligibility?: ResourceEligibility | null;
   status: "active" | "expired" | "broken";
   lastVerifiedAt: number | null;
 };
@@ -82,6 +89,7 @@ const resourceColumns = {
   categoryId: resources.categoryId,
   tags: resources.tags,
   region: resources.region,
+  kind: resources.kind,
   regions: resources.regions,
   regionLocked: resources.regionLocked,
   costType: resources.costType,
@@ -89,6 +97,11 @@ const resourceColumns = {
   creditCardRequired: resources.creditCardRequired,
   duration: resources.duration,
   deadline: resources.deadline,
+  opensAt: resources.opensAt,
+  recurrence: resources.recurrence,
+  amount: resources.amount,
+  provider: resources.provider,
+  eligibility: resources.eligibility,
   status: resources.status,
   lastVerifiedAt: resources.lastVerifiedAt,
   categorySlug: categories.slug,
@@ -96,9 +109,10 @@ const resourceColumns = {
   categoryIcon: categories.icon,
 };
 
-type ResourceRow = Omit<Resource, "lastVerifiedAt" | "deadline"> & {
+type ResourceRow = Omit<Resource, "lastVerifiedAt" | "deadline" | "opensAt"> & {
   lastVerifiedAt: Date | null;
   deadline: Date | null;
+  opensAt: Date | null;
 };
 
 function toResource(row: ResourceRow): Resource {
@@ -106,6 +120,7 @@ function toResource(row: ResourceRow): Resource {
     ...row,
     lastVerifiedAt: row.lastVerifiedAt ? row.lastVerifiedAt.getTime() : null,
     deadline: row.deadline ? row.deadline.getTime() : null,
+    opensAt: row.opensAt ? row.opensAt.getTime() : null,
   };
 }
 
