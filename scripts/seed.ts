@@ -1,4 +1,6 @@
-// Idempotent: upserts categories/resources from offers.json.
+// Idempotent: upserts categories/resources from offers.json, plus
+// student_resources.json when present and the curated flagship
+// opportunities (issue #79).
 // Re-run any time the raw data source changes: `pnpm db:seed`.
 //
 // Unlike the old delete-everything approach, re-seeding never wipes rows:
@@ -7,15 +9,13 @@
 // creditCardRequired, duration) are backfilled only where currently NULL so
 // manual /admin corrections survive a re-seed, and status is left untouched
 // so link-health verdicts (broken/expired) are preserved.
-import path from "node:path";
 import { sql } from "drizzle-orm";
 import { db, schema } from "../src/db";
-import { normalizeOffers } from "./normalize-data";
+import { normalizeAll } from "./normalize-data";
 
 async function main() {
-  const { categories, resources } = normalizeOffers(
-    path.join(process.cwd(), "offers.json"),
-  );
+  const { categories, resources, report } = normalizeAll(process.cwd());
+  console.log(`Dataset: ${JSON.stringify(report)}`);
 
   await db.insert(schema.categories).values(categories).onConflictDoUpdate({
     target: schema.categories.slug,
@@ -53,6 +53,13 @@ async function main() {
       verificationNeeded: r.verificationNeeded ?? null,
       creditCardRequired: r.creditCardRequired ?? null,
       duration: r.duration ?? null,
+      kind: r.kind ?? "perk",
+      opensAt: r.opensAt ?? null,
+      deadline: r.deadline ?? null,
+      recurrence: r.recurrence ?? null,
+      amount: r.amount ?? null,
+      provider: r.provider ?? null,
+      eligibility: r.eligibility ?? null,
       status: r.status,
       createdAt: now,
       updatedAt: now,
@@ -79,6 +86,18 @@ async function main() {
       verificationNeeded: sql`COALESCE(${schema.resources.verificationNeeded}, excluded."verification_needed")`,
       creditCardRequired: sql`COALESCE(${schema.resources.creditCardRequired}, excluded."credit_card_required")`,
       duration: sql`COALESCE(${schema.resources.duration}, excluded."duration")`,
+      // Opportunity fields (issue #79). The curated flagship file is the
+      // reviewed source of truth for dates, so a non-NULL seeded value wins
+      // and a new cycle's dates land on re-seed; NULL never wipes a date an
+      // admin entered. Kind/amount/provider/recurrence/eligibility are
+      // backfilled only where still NULL (or 'perk'), like the fields above.
+      kind: sql`CASE WHEN ${schema.resources.kind} = 'perk' THEN excluded."kind" ELSE ${schema.resources.kind} END`,
+      opensAt: sql`COALESCE(excluded."opens_at", ${schema.resources.opensAt})`,
+      deadline: sql`COALESCE(excluded."deadline", ${schema.resources.deadline})`,
+      recurrence: sql`COALESCE(${schema.resources.recurrence}, excluded."recurrence")`,
+      amount: sql`COALESCE(${schema.resources.amount}, excluded."amount")`,
+      provider: sql`COALESCE(${schema.resources.provider}, excluded."provider")`,
+      eligibility: sql`COALESCE(${schema.resources.eligibility}, excluded."eligibility")`,
       updatedAt: sql`excluded."updated_at"`,
     },
   });

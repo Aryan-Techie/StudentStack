@@ -126,6 +126,8 @@ src/
 scripts/
 ├── normalize-data.ts                      # Raw offers.json → normalized rows
 ├── seed.ts                                # Reload categories/resources into Postgres
+├── student-resources.ts                   # student_resources.json → net-new rows (deduplicated against offers.json)
+├── flagship.ts                            # Overlays the curated flagship opportunities onto the dataset
 └── create-admin.ts                        # One-time bootstrap of the admin Supabase Auth user
 
 drizzle/
@@ -242,6 +244,13 @@ offers.json → scripts/normalize-data.ts → scripts/seed.ts → Supabase
 ```
 
 Normalization maps source categories, regions, cost types, tags, descriptions, and claim URLs into the app's schema. `pnpm db:seed` is idempotent — it clears and reloads the `categories` and `resources` tables every time it runs, so it's safe to re-run whenever `offers.json` changes.
+
+### Opportunity data (issue #79)
+
+Two more inputs feed `pnpm db:seed`:
+
+- **`student_resources.json`** (optional, gitignored like `offers.json`): the [resources.tensorboy.com](https://resources.tensorboy.com/resources.json) export. `scripts/student-resources.ts` maps its four buckets to `kind` (perk, scholarship, fellowship, internship, mentorship, program), drops job boards and loan marketplaces, and skips anything `offers.json` already lists, matching on the product name with deal words like "Student" or "Education Plan" removed, or on the claim link. Against the current `offers.json` that leaves about 100 net-new rows.
+- **`src/lib/flagship-opportunities.ts`** (committed): about 60 hand-curated scholarships, fellowships, internships, open-source programs, and free mentorship programs, with the amount, provider, eligibility, and usual opening month. Opening dates and deadlines are only filled in where they were read off the program's official page, and `source` records that page. The seed overlays these onto matching rows and adds the rest. The mock data uses the same file, so `/deadlines` shows real programs without a database. When a new cycle is announced, update the dates in this file and re-seed.
 
 The directory currently loads the full dataset server-side and filters in memory — intentional at ~600 rows, and a paginated query layer can be introduced later if the dataset grows significantly.
 

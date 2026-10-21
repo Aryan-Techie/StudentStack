@@ -1,4 +1,5 @@
 import type { Category, Resource } from "./resources";
+import { FLAGSHIP_OPPORTUNITIES } from "./flagship-opportunities";
 
 export const MOCK_CATEGORIES: Category[] = [
   { id: 1, slug: "development-tools", name: "Development Tools", icon: "dev" },
@@ -10,6 +11,7 @@ export const MOCK_CATEGORIES: Category[] = [
   { id: 7, slug: "health-and-wellness", name: "Health & Wellness", icon: "health" },
   { id: 8, slug: "security-and-privacy", name: "Security & Privacy", icon: "security" },
   { id: 9, slug: "domains-and-web", name: "Domains & Web", icon: "domains" },
+  { id: 10, slug: "learning-and-education", name: "Learning & Education", icon: "learn" },
 ];
 
 export const MOCK_RESOURCES: Resource[] = [
@@ -308,34 +310,43 @@ export const MOCK_RESOURCES: Resource[] = [
     lastVerifiedAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
     deadline: null,
   },
-  {
-    id: 13,
-    slug: "google-summer-of-code",
-    name: "Google Summer of Code",
-    tagline: "Paid open-source contributor program",
-    description: "Work with an open-source organization on a 12+ week programming project under the guidance of mentors, with a stipend scaled to your country.",
-    url: "https://summerofcode.withgoogle.com/",
-    hasStaticClaimUrl: true,
-    categoryId: 1,
-    categorySlug: "development-tools",
-    categoryName: "Development Tools",
-    categoryIcon: "🛠️",
-    tags: ["Open Source", "Mentorship"],
-    region: "Global",
-    kind: "program",
-    regions: [],
-    regionLocked: false,
-    costType: "stipend",
-    verificationNeeded: "none",
-    creditCardRequired: false,
-    duration: "one_time",
-    status: "active",
-    lastVerifiedAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
-    deadline: Date.now() + 1000 * 60 * 60 * 24 * 30,
-    opensAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
-    recurrence: "annual, opens Mar",
-    amount: "$1,500–6,600",
-    provider: "Google",
-    eligibility: null,
-  },
+
 ];
+
+// The curated flagship opportunities (issue #79), so /deadlines and the
+// opportunity filters show real programs without a database.
+const listedSlugs = new Set(MOCK_RESOURCES.map((r) => r.slug));
+for (const [i, f] of FLAGSHIP_OPPORTUNITIES.entries()) {
+  if (listedSlugs.has(f.slug)) continue;
+  const category = MOCK_CATEGORIES.find((c) => c.slug === f.categorySlug) ?? MOCK_CATEGORIES[0];
+  MOCK_RESOURCES.push({
+    id: 100 + i,
+    slug: f.slug,
+    name: f.name,
+    tagline: f.tagline ?? f.amount ?? null,
+    description: f.description,
+    url: f.url,
+    hasStaticClaimUrl: true,
+    categoryId: category.id,
+    categorySlug: category.slug,
+    categoryName: category.name,
+    categoryIcon: category.icon,
+    tags: f.tags ?? [],
+    region: f.region,
+    kind: f.kind,
+    regions: f.region === "IN" ? ["IN"] : (f.eligibility?.countries ?? []),
+    regionLocked: f.region === "IN",
+    costType: f.costType,
+    verificationNeeded: null,
+    creditCardRequired: null,
+    duration: null,
+    status: "active",
+    lastVerifiedAt: f.verifiedOn ? Date.parse(f.verifiedOn) : null,
+    deadline: f.deadline ? Date.parse(`${f.deadline}T12:00:00Z`) : null,
+    opensAt: f.opensAt ? Date.parse(`${f.opensAt}T12:00:00Z`) : null,
+    recurrence: f.recurrence ?? null,
+    amount: f.amount ?? null,
+    provider: f.provider,
+    eligibility: f.eligibility ?? null,
+  });
+}

@@ -4,8 +4,12 @@
 // claim_url handling). Region data is preserved per issue #74: the raw
 // location string is parsed into regions[]/regionLocked instead of
 // collapsing non-India regions to "Global".
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { ResourceEligibility } from "../src/db/schema";
+import { FLAGSHIP_OPPORTUNITIES } from "../src/lib/flagship-opportunities";
+import { applyFlagship } from "./flagship";
+import { normalizeStudentResources, type RawStudentResources } from "./student-resources";
 
 export type NormalizedCategory = {
   slug: string;
@@ -43,6 +47,15 @@ export type NormalizedResource = {
   creditCardRequired?: boolean;
   duration?: "one_time" | "one_year" | "while_student" | "lifetime";
   status: "active" | "expired" | "broken";
+  // Opportunity fields (issues #78, #79). Set for student_resources.json
+  // rows and the curated flagship programs; offers.json rows are perks.
+  kind?: "perk" | "scholarship" | "fellowship" | "internship" | "mentorship" | "program";
+  opensAt?: Date | null;
+  deadline?: Date | null;
+  recurrence?: string | null;
+  amount?: string | null;
+  provider?: string | null;
+  eligibility?: ResourceEligibility | null;
 };
 
 export type RawOffer = {
@@ -293,6 +306,48 @@ export function normalizeOffers(offersJsonPath: string): {
 } {
   const raw = JSON.parse(readFileSync(offersJsonPath, "utf-8")) as RawOffer[];
   return normalizeRawOffers(raw);
+}
+
+// Full dataset for `pnpm db:seed` (issue #79): offers.json, plus
+// student_resources.json when it's present (net-new rows only), plus the
+// curated flagship opportunities overlaid on top.
+export function normalizeAll(root: string): {
+  categories: NormalizedCategory[];
+  resources: NormalizedResource[];
+  report: { offers: number; studentResources: number; studentDuplicates: number; flagshipEnriched: number; flagshipAdded: number };
+} {
+  const { categories, resources: offers } = normalizeOffers(path.join(root, "offers.json"));
+  const studentPath = path.join(root, "student_resources.json");
+  const student = existsSync(studentPath)
+    ? normalizeStudentResources(JSON.parse(readFileSync(studentPath, "utf-8")) as RawStudentResources, offers)
+    : { resources: [], duplicates: [], excluded: [] };
+  const merged = applyFlagship([...offers, ...student.resources], FLAGSHIP_OPPORTUNITIES);
+
+  // Curated and student_resources rows can reference categories offers.json
+  // doesn't use; make sure each one exists.
+  const known = new Set(categories.map((c) => c.slug));
+  for (const r of merged.resources) {
+    if (known.has(r.categorySlug)) continue;
+    known.add(r.categorySlug);
+    categories.push({
+      slug: r.categorySlug,
+      name: r.categorySlug.replace(/-and-/g, " & ").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      icon: "📦",
+      sortOrder: categories.length,
+    });
+  }
+
+  return {
+    categories,
+    resources: merged.resources,
+    report: {
+      offers: offers.length,
+      studentResources: student.resources.length,
+      studentDuplicates: student.duplicates.length,
+      flagshipEnriched: merged.enriched.length,
+      flagshipAdded: merged.added.length,
+    },
+  };
 }
 
 if (process.argv[1] && process.argv[1].endsWith("normalize-data.ts")) {
