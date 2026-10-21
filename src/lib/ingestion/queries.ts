@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import type { CandidateRow } from "./run-ingestion";
+import type { CandidateRow, SourceRunSummary } from "./run-ingestion";
 
 export async function getExistingCandidateKeys(): Promise<Set<string>> {
   const rows = await db
@@ -88,4 +88,37 @@ export async function markCandidateReviewed(id: number, status: "approved" | "re
     .update(schema.ingestionCandidates)
     .set({ status, reviewedAt: new Date() })
     .where(eq(schema.ingestionCandidates.id, id));
+}
+
+// Source state (issues #83, #40): fingerprints for change detection and
+// the last run's outcome for source health.
+export type SourceState = typeof schema.ingestionSources.$inferSelect;
+
+export async function getSourceStates(): Promise<SourceState[]> {
+  if (!process.env.POSTGRES_URL) return [];
+  try {
+    return await db.select().from(schema.ingestionSources);
+  } catch (error) {
+    console.warn("[StudentStack DB] getSourceStates query failed:", error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
+export async function saveSourceRuns(summary: SourceRunSummary[], now: Date = new Date()): Promise<void> {
+  for (const run of summary) {
+    const status = run.error ? "error" : run.unchanged ? "unchanged" : "ok";
+    const fields = {
+      lastRunAt: now,
+      lastStatus: status as SourceState["lastStatus"],
+      lastError: run.error ?? null,
+      lastFetched: run.fetched,
+      lastQueued: run.queued,
+      // Keep the old fingerprint when a run fails, so the next run retries.
+      ...(run.error ? {} : { lastVersion: run.version ?? null, lastSuccessAt: now }),
+    };
+    await db
+      .insert(schema.ingestionSources)
+      .values({ name: run.sourceName, ...fields })
+      .onConflictDoUpdate({ target: schema.ingestionSources.name, set: fields });
+  }
 }

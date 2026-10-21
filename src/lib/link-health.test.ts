@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { classifyCheck, checkUrl, runWithConcurrency, resolveStatusTransition } from '@/lib/link-health';
+import { classifyCheck, checkUrl, runWithConcurrency, resolveStatusTransition, deadlineRollover } from '@/lib/link-health';
 
 const mockAssertPublicUrl = vi.hoisted(() => vi.fn());
 
@@ -349,5 +349,26 @@ describe('link-health.ts', () => {
         process.argv[1] = originalArgv;
       }
     });
+  });
+});
+
+describe("deadlineRollover (issue #83)", () => {
+  const now = Date.UTC(2026, 9, 20);
+  const past = new Date(now - 86_400_000);
+  const future = new Date(now + 86_400_000);
+
+  it("expires a past one-off deadline", () => {
+    expect(deadlineRollover({ deadline: past, recurrence: null, status: "active" }, now)).toEqual({ action: "expire" });
+  });
+
+  it("clears a past deadline that recurs", () => {
+    expect(deadlineRollover({ deadline: past, recurrence: "Feb", status: "broken" }, now)).toEqual({ action: "clear_deadline" });
+  });
+
+  it("leaves future, missing, and already-expired deadlines alone", () => {
+    expect(deadlineRollover({ deadline: future, recurrence: null, status: "active" }, now)).toBeNull();
+    expect(deadlineRollover({ deadline: null, recurrence: null, status: "active" }, now)).toBeNull();
+    expect(deadlineRollover({ deadline: past, recurrence: null, status: "expired" }, now)).toBeNull();
+    expect(deadlineRollover({ deadline: past, recurrence: "  ", status: "active" }, now)).toEqual({ action: "expire" });
   });
 });

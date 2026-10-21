@@ -15,7 +15,18 @@ export type SourceRunSummary = {
   queued: number;
   duplicates: number;
   mappingErrors: number;
+  // Candidates dropped because their deadline already passed (issue #83).
+  expired: number;
+  // Upstream fingerprint seen this run, and whether it matched last run's
+  // so the source was skipped (issue #83).
+  version?: string | null;
+  unchanged?: boolean;
   error?: string;
+};
+
+export type RunOptions = {
+  nowMs?: number;
+  previousVersions?: Map<string, string | null>;
 };
 
 export type IngestionRunResult = {
@@ -30,6 +41,7 @@ export async function runIngestion(
   sources: IngestionSource[],
   existingResources: Resource[],
   alreadySeenKeys: Set<string>, // `${sourceName}:${externalId}`
+  { nowMs = Date.now(), previousVersions = new Map() }: RunOptions = {},
 ): Promise<IngestionRunResult> {
   const toInsert: CandidateRow[] = [];
   const summary: SourceRunSummary[] = [];
@@ -41,9 +53,20 @@ export async function runIngestion(
       queued: 0,
       duplicates: 0,
       mappingErrors: 0,
+      expired: 0,
     };
 
     try {
+      if (source.version) {
+        result.version = await source.version();
+        const previous = previousVersions.get(source.name);
+        if (result.version && previous === result.version) {
+          result.unchanged = true;
+          summary.push(result);
+          continue;
+        }
+      }
+
       const raw = await source.fetchCandidates();
       result.fetched = raw.length;
 
@@ -54,6 +77,11 @@ export async function runIngestion(
           continue;
         }
         if (candidate.externalId && alreadySeenKeys.has(`${source.name}:${candidate.externalId}`)) {
+          continue;
+        }
+        // Issue #83: never queue an opportunity that has already closed.
+        if (candidate.deadline && candidate.deadline.getTime() < nowMs) {
+          result.expired++;
           continue;
         }
 
@@ -80,35 +108,4 @@ export async function runIngestion(
   }
 
   return { toInsert, summary };
-}
-
-if (process.argv[1] && process.argv[1].endsWith("run-ingestion.ts")) {
-  const existing: Resource[] = [];
-
-  const goodSource: IngestionSource = {
-    name: "fake-good",
-    fetchCandidates: async () => [{ name: "Real Tool", description: "A real tool" }, { name: "" }],
-    mapToCandidate: (raw) => {
-      const r = raw as { name: string; description?: string };
-      if (!r.name) return null;
-      return { name: r.name, description: r.description ?? "" };
-    },
-  };
-
-  const brokenSource: IngestionSource = {
-    name: "fake-broken",
-    fetchCandidates: async () => {
-      throw new Error("network error");
-    },
-    mapToCandidate: () => null,
-  };
-
-  runIngestion([goodSource, brokenSource], existing, new Set()).then((result) => {
-    console.assert(result.toInsert.length === 1, `expected 1 candidate queued, got ${result.toInsert.length}`);
-    console.assert(result.summary[0].fetched === 2, "good source should report 2 fetched");
-    console.assert(result.summary[0].mappingErrors === 1, "the empty-name item should count as a mapping error");
-    console.assert(result.summary[1].error === "network error", "broken source's failure should be captured, not thrown");
-    console.assert(result.summary.length === 2, "both sources should report a summary even though one failed");
-    console.log("OK: run-ingestion.ts self-check passed");
-  });
 }

@@ -35,6 +35,8 @@ Supabase project**. Do not commit `.env.local`, credentials, or exported user da
 | `RESEND_API_KEY` | Optional: Resend API key for the weekly digest email |
 | `DIGEST_FROM_EMAIL` | Optional: verified sender address for the weekly digest |
 | `DIGEST_SECRET` | Optional: signs digest unsubscribe links (defaults to `CRON_SECRET`) |
+| `APIFY_TOKEN` | Optional: enables the paid Apify ingestion sources |
+| `GITHUB_TOKEN` | Optional: raises the GitHub API rate limit for ingestion change detection |
 
 Use the Supavisor pooler host as described in the README. The direct Supabase
 database host may require IPv6 connectivity.

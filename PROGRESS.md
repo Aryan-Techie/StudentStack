@@ -336,6 +336,40 @@ PRD §8.12's weekly digest, sent with Resend.
   because email link scanners fetch every URL. RFC 8058 `List-Unsubscribe`
   headers point at `POST /api/digest/unsubscribe` for Gmail/Yahoo's own
   button. `/my-list` shows the current setting with an on/off button.
+## Issue #83 — Ingestion sources and deadline expiry
+
+`SOURCES` was empty. It now has seven free sources, plus four paid Apify
+sources that only turn on when `APIFY_TOKEN` is set. Opportunity Desk is
+left to #104.
+
+- **Shared parsers.** `src/lib/ingestion/rss.ts` is a dependency-free RSS 2.0
+  parser plus `extractDeadline()`, which prefers a date right after a
+  "Deadline / closes / apply by / last date" cue and rejects impossible
+  dates (30 February). `src/lib/ingestion/markdown.ts` parses Markdown
+  tables and `### [Name](url)` / `- [Name](url) — note` link lists.
+- **Sources.** Scholars4Dev and Brabble RSS (hackathons and contests only),
+  three open-source program lists on GitHub (`programs.yml` via the new
+  `yaml` dependency, plus two Markdown tables), `awesome-edu-perks` (tagged
+  `US`), and the GitHub Student Developer Pack page. Apify: scholarships,
+  hackathons (Devpost + ETHGlobal), Unstop (scholarships and hackathons
+  only, not a job board), and Internshala limited to flagship companies.
+  Apify runs cap `maxItems`/`maxResults` because each run is billed to the
+  maintainer.
+- **Change detection.** `IngestionSource.version()` is optional. GitHub
+  sources return the file's latest commit SHA (`GITHUB_TOKEN` raises the
+  rate limit); an unchanged SHA skips the download. State lives in the new
+  `ingestion_sources` table (`drizzle/0007_ingestion_sources.sql`), which
+  #40 builds source monitoring on. A failed run keeps the old fingerprint so
+  the next run retries.
+- **Deadlines.** `runIngestion` drops candidates whose deadline already
+  passed. The link-health cron now starts with `deadlineRollover()`: no
+  `recurrence` → `expired`; with a `recurrence` → `deadline = null`, keeping
+  the "Opens again" label. This runs before link checks so newly expired
+  rows aren't fetched.
+- **Judgment calls.** The ingest cron moved to Mondays and Thursdays, since
+  opportunity feeds move faster than perks. Both existing crons now reject
+  requests when `CRON_SECRET` is unset (`Bearer undefined` used to pass).
+  The inline `run-ingestion.ts` self-check moved to vitest.
 
 ## Status: Phase 2 (PRD §13) — done
 

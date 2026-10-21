@@ -135,3 +135,18 @@ if (process.argv[1] && process.argv[1].endsWith("link-health.ts")) {
     console.log("OK: link-health pure logic self-check passed");
   });
 }
+
+// Deadline expiry (issue #83), applied by the weekly link-health cron
+// before it checks links. A live resource whose deadline has passed is
+// either finished (no recurrence → 'expired') or will open again
+// (recurrence set → clear the stale deadline and keep the "Opens again
+// ~<recurrence>" label).
+export type DeadlineRollover = { action: "expire" } | { action: "clear_deadline" } | null;
+
+export function deadlineRollover(
+  r: { deadline: Date | null; recurrence: string | null; status: LinkHealthStatus },
+  nowMs: number,
+): DeadlineRollover {
+  if (!r.deadline || r.status === "expired" || r.deadline.getTime() >= nowMs) return null;
+  return r.recurrence?.trim() ? { action: "clear_deadline" } : { action: "expire" };
+}

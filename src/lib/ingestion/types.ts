@@ -23,4 +23,8 @@ export type IngestionSource = {
   name: string;
   fetchCandidates(): Promise<RawCandidate[]>;
   mapToCandidate(raw: RawCandidate): CandidateFields | null; // null = skip this item (unmappable)
+  // Optional change detection (issue #83): a cheap fingerprint of the
+  // upstream data, e.g. the latest commit SHA of a GitHub file. When it
+  // matches the previous run's, the source is skipped.
+  version?(): Promise<string | null>;
 };

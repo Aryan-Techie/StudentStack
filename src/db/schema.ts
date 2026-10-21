@@ -215,3 +215,17 @@ export const ingestionCandidates = pgTable("ingestion_candidates", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
 });
+
+// Per-source state for the ingestion cron (issues #83, #40): the last
+// upstream fingerprint (for change detection) and the last run's outcome
+// (for source health on /admin/ingestion).
+export const ingestionSources = pgTable("ingestion_sources", {
+  name: text("name").primaryKey(),
+  lastVersion: text("last_version"),
+  lastRunAt: timestamp("last_run_at"),
+  lastStatus: text("last_status", { enum: ["ok", "unchanged", "error"] }),
+  lastError: text("last_error"),
+  lastFetched: integer("last_fetched").notNull().default(0),
+  lastQueued: integer("last_queued").notNull().default(0),
+  lastSuccessAt: timestamp("last_success_at"),
+}).enableRLS();
