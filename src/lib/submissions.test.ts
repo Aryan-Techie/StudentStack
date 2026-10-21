@@ -50,8 +50,19 @@ describe("validateSubmission", () => {
     [{ description: "too short" }, "description"],
     [{ name: "x".repeat(81) }, "name"],
     [{ tagline: "x".repeat(91) }, "tagline"],
+    [{ credit: "x".repeat(41) }, "credit"],
+    [{ credit: "see https://spam.example" }, "credit"],
   ] as [Record<string, string>, SubmissionField][])("rejects %o on %s", (patch, field) => {
     expect(fieldError(patch, field)).toBe(true);
+  });
+});
+
+describe("contributor credit", () => {
+  it("is optional and normalizes whitespace", () => {
+    const none = validateSubmission(good, cats);
+    expect(none.ok && none.value.credit).toBeNull();
+    const named = validateSubmission({ ...good, credit: "  Priya,   IIT Madras " }, cats);
+    expect(named.ok && named.value.credit).toBe("Priya, IIT Madras");
   });
 });
 

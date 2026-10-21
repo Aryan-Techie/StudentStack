@@ -273,6 +273,43 @@ PRD §8.11 on top of the existing `reviews` table.
   can't reach the table.
 - **No "most helpful" sort.** It needs a helpfulness-vote table; left as a
   follow-up to keep the change focused.
+## Issue #82 — Public API, llms.txt, and community credits
+
+- **Public read API.** `GET /api/resources` gains `kind` (comma-separated),
+  `category` (slug), `region` (`IN` = works in India, `Global` = not
+  region-locked, same meaning as the directory facets) and
+  `deadline_before` (ISO date: active listings still open now that close on
+  or before it). Invalid values return `400` naming the parameter.
+  Filtering runs in SQL (`apiFilterConditions` in `src/lib/resources.ts`);
+  `matchesApiFilters` in `src/lib/api-filters.ts` is the in-memory twin for
+  the mock-data fallback and tests. `GET /api/resources/{slug}` returns one
+  approved resource or `404`, using the same resolver as `/r/[slug]`.
+- **Caching and limits.** Both endpoints send `Cache-Control: public,
+  s-maxage=60, stale-while-revalidate=300` and allow 60 requests/minute per
+  client IP (`429` + `Retry-After`, `X-RateLimit-*` headers).
+- **API & Agents.** `/api-docs` documents parameters, response shape, date
+  format, feeds, and fair-use limits with `curl` examples. `/llms.txt`
+  follows llmstxt.org: summary, endpoints, feeds, pages, presets, comparison
+  sets, and category slugs from the DB. Both are in the footer; `/api-docs`
+  is in the sitemap.
+- **Community freshness and credits.** "N students got this" is one
+  aggregate `GROUP BY` over `bookmarks` with `status = 'got_it'`, shown on
+  cards and `/r/[slug]` when above 0. `/submit` has an optional "Credit me
+  as" field (40 characters, plain text, links rejected) stored in
+  `resources.contributor_credit` (`drizzle/0005_contributor_credit.sql`);
+  approved pages show "Added by …", and admins can edit or clear it.
+
+### Judgment calls (#82)
+
+- **The single-resource handler lives at `src/app/api/resources/[id]/route.ts`.**
+  A sibling `[slug]` folder next to the existing `[id]/click` route makes
+  Next.js fail every `/api/resources/*` request ("You cannot use different
+  slug names for the same dynamic path"). The segment is named `[id]` but
+  holds the slug. If #98 lands a different fix first, this can move.
+- **The rate limiter is in-memory per function instance.** Enough to slow
+  one noisy client; the CDN cache absorbs most repeat traffic. A shared
+  store (e.g. Redis) would be needed for a hard global limit.
+- **Got-it counts expose numbers only**, never which students.
 
 ## Status: Phase 2 (PRD §13) — done
 

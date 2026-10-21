@@ -108,6 +108,7 @@ export async function updateResource(id: number, formData: FormData) {
         | "lifetime"
         | null,
       ...parseOpportunityFields(formData),
+      contributorCredit: String(formData.get("contributorCredit") ?? "").trim().slice(0, 40) || null,
       status: formData.get("status") as (typeof schema.resources.$inferInsert)["status"],
       ...(shouldApprove ? { approved: true } : {}),
       updatedAt: new Date(),

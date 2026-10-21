@@ -14,7 +14,7 @@ import { getSiteUrl } from "@/lib/site";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const MAX_PENDING_PER_STUDENT = 5;
-const SUBMISSION_FIELDS = ["name", "url", "tagline", "description", "categoryId", "costType", "region"] as const;
+const SUBMISSION_FIELDS = ["name", "url", "tagline", "description", "categoryId", "costType", "region", "credit"] as const;
 
 // Supabase only redirects to URLs on the project's allow list, so building the
 // callback from the request's own origin can't send anyone off-site. `next`
@@ -143,6 +143,7 @@ export async function submitResource(_prev: SubmitState, formData: FormData): Pr
     status: "active",
     approved: false,
     submittedBy: user.id,
+    contributorCredit: offer.credit,
   });
 
   // Tell the admin a submission is waiting (opt-in webhook). Runs after the

@@ -44,6 +44,8 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **"Only what I'm eligible for"** — an accountless eligibility profile (country, state, degree level, year, field, and whether you have a college email, the GitHub Student Pack, or a student ID) set from the directory and saved in the browser. A toggle then hides offers you can't claim. Signed-in students get the profile synced across devices.
 - **Personal deadlines calendar** — signed-in students can get a private `/u/<token>/deadlines.ics` link from `/my-list` that subscribes Google Calendar, Apple Calendar, or Outlook to the deadlines of their saved offers. The link can be reset at any time.
 - **Student reviews and ratings** on each `/r/[slug]` page: students who saved an offer can leave a 1–5 star rating and an optional comment (one review per student per offer, editable). Reviews show as "Student" with a "Verified student" badge for academic emails, sort by most recent or highest rated, and directory cards show the average and count.
+- **Public read API and agent docs**: `GET /api/resources` (filters for `kind`, `category`, `region`, `deadline_before`) and `GET /api/resources/{slug}`, cached at the CDN and rate limited per client. `/api-docs` documents them with `curl` examples and `/llms.txt` gives AI agents a map of the site; both are linked from the footer.
+- **Community credits**: cards and resource pages show "N students got this" (an aggregate count only), and `/submit` has an optional "Credit me as" field shown as "Added by …" once a submission is approved.
 
 ---
 
@@ -79,6 +81,10 @@ src/
 │   ├── u/[token]/deadlines.ics/route.ts   # Per-user calendar feed of saved deadlines (token in URL)
 │   ├── reviews/actions.ts                 # Submit/delete review Server Actions
 │   ├── api/reviews/route.ts               # Signed-in student's own review + whether they can review
+│   ├── api-docs/page.tsx                  # Public API & Agents documentation
+│   ├── llms.txt/route.ts                  # llms.txt for AI agents
+│   ├── api/resources/route.ts             # Public list API with filters, cache, rate limit
+│   ├── api/resources/[id]/route.ts        # Public single-resource API (segment holds the slug)
 │   └── api/cron/link-health/route.ts      # Weekly link-health check
 ├── components/
 │   ├── directory/                         # Search, filters, cards, loading UI
@@ -96,6 +102,9 @@ src/
 │   ├── link-health.ts                     # URL health-check logic
 │   ├── reviews.ts                         # Review queries and rating aggregates
 │   ├── review-rules.ts                    # Review validation, academic-email check, rating format
+│   ├── api-filters.ts                     # Public API filter parsing and matching
+│   ├── rate-limit.ts                      # In-memory per-instance API rate limiter
+│   ├── llms-txt.ts                        # Builds the /llms.txt body
 │   ├── admin/auth.ts                      # Admin session verification
 │   ├── supabase/                          # Supabase client helpers (browser + server)
 │   └── ingestion/                         # Resource ingestion pipeline
@@ -225,6 +234,21 @@ Schema changes are tracked as migrations under [`drizzle/`](drizzle). `0000_base
 ## Link-Health Checks
 
 `GET /api/cron/link-health`, triggered weekly by Vercel Cron (see [`vercel.json`](vercel.json)), re-checks every resource that has a static claim URL and hasn't been manually marked `expired`. It issues a `HEAD` request (falling back to `GET` on `405`/`501`), classifies the result as `active` or `broken`, and revalidates the homepage and directory so status changes show up immediately. The route requires a `Bearer ${CRON_SECRET}` header and runs up to 25 checks concurrently.
+
+---
+
+## Public API
+
+Read-only JSON over approved resources, documented in full at `/api-docs` and summarized for agents at `/llms.txt`:
+
+```bash
+curl "http://localhost:3000/api/resources?kind=scholarship,fellowship&region=IN&deadline_before=2026-12-31"
+curl "http://localhost:3000/api/resources/github-copilot"
+```
+
+- `GET /api/resources` takes `page`, `limit` (max 100), `kind` (comma-separated), `category` (slug), `region` (`IN` or `Global`), and `deadline_before` (ISO date). Invalid values return `400` naming the parameter.
+- `GET /api/resources/{slug}` returns one approved resource or `404`.
+- Responses send `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. Each client IP gets 60 requests per minute per function instance (`429` with `Retry-After` past that, plus `X-RateLimit-Limit` / `X-RateLimit-Remaining` headers).
 
 ---
 

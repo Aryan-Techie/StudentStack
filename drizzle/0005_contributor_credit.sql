@@ -1,0 +1,1 @@
+ALTER TABLE "resources" ADD COLUMN "contributor_credit" text;

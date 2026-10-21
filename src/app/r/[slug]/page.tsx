@@ -13,6 +13,7 @@ import { BookmarkButton } from "@/components/bookmarks/bookmark-button";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { getRatingSummary, getResourceReviews, type ReviewSort } from "@/lib/reviews";
+import { getGotItCount } from "@/lib/bookmarks";
 import { formatRating, type RatingSummary } from "@/lib/review-rules";
 import { passFontVariables } from "@/lib/fonts";
 import homeStyles from "@/components/home/brand.module.css";
@@ -119,9 +120,10 @@ export default async function ResourcePage({
   const resource = await getResourceBySlug(slug);
   if (!resource) notFound();
   const reviewSort: ReviewSort = (await searchParams).reviews === "highest" ? "highest" : "recent";
-  const [reviews, rating] = await Promise.all([
+  const [reviews, rating, gotItCount] = await Promise.all([
     getResourceReviews(resource.id, reviewSort),
     getRatingSummary(resource.id),
+    getGotItCount(resource.id),
   ]);
 
   const siteUrl = getSiteUrl();
@@ -162,6 +164,9 @@ export default async function ResourcePage({
             </header>
 
             <p className="mb-8 max-w-2xl text-base leading-relaxed">{resource.description}</p>
+            {resource.contributorCredit ? (
+              <p className="-mt-6 mb-8 text-sm text-muted-foreground">Added by {resource.contributorCredit}</p>
+            ) : null}
 
             <div className="mb-10 flex flex-wrap items-center gap-3">
               {resource.hasStaticClaimUrl && resource.url ? (
@@ -179,6 +184,11 @@ export default async function ResourcePage({
                 />
               </BookmarksProvider>
               {verified ? <span className="text-xs text-muted-foreground">{verified}</span> : null}
+              {gotItCount > 0 ? (
+                <span className="text-xs font-semibold">
+                  {gotItCount} student{gotItCount === 1 ? "" : "s"} got this
+                </span>
+              ) : null}
             </div>
 
             <dl className="mb-12 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -104,6 +104,9 @@ export const resources = pgTable("resources", {
   consecutiveFailures: integer("consecutive_failures").notNull().default(0),
   clickCount: integer("click_count").notNull().default(0),
   submittedBy: text("submitted_by"),
+  // Optional public credit a student asked for when submitting (issue #82),
+  // e.g. "Priya, IIT Madras". Shown on /r/[slug] once approved.
+  contributorCredit: text("contributor_credit"),
   approved: boolean("approved").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
