@@ -3,6 +3,9 @@ import {
   getWebhookUrl,
   buildBrokenLinksMessage,
   notifyBrokenLinks,
+  getSubmissionsWebhookUrl,
+  buildNewSubmissionMessage,
+  notifyNewSubmission,
   type BrokenLink,
   type LinkHealthSummary,
 } from '@/lib/admin-notify';
@@ -22,6 +25,7 @@ const links: BrokenLink[] = [
 
 afterEach(() => {
   delete process.env.LINK_HEALTH_WEBHOOK_URL;
+  delete process.env.SUBMISSIONS_WEBHOOK_URL;
 });
 
 describe('admin-notify.ts', () => {
@@ -113,6 +117,52 @@ describe('admin-notify.ts', () => {
       });
       expect(result.sent).toBe(false);
       expect((result as { reason: string }).reason).toContain('fetch failed');
+    });
+  });
+
+  describe('getSubmissionsWebhookUrl', () => {
+    it('prefers SUBMISSIONS_WEBHOOK_URL', () => {
+      expect(
+        getSubmissionsWebhookUrl({
+          SUBMISSIONS_WEBHOOK_URL: 'https://hooks.example/subs',
+          LINK_HEALTH_WEBHOOK_URL: 'https://hooks.example/links',
+        } as unknown as NodeJS.ProcessEnv),
+      ).toBe('https://hooks.example/subs');
+    });
+
+    it('falls back to LINK_HEALTH_WEBHOOK_URL, then null', () => {
+      expect(
+        getSubmissionsWebhookUrl({ LINK_HEALTH_WEBHOOK_URL: 'https://hooks.example/links' } as unknown as NodeJS.ProcessEnv),
+      ).toBe('https://hooks.example/links');
+      expect(getSubmissionsWebhookUrl({} as unknown as NodeJS.ProcessEnv)).toBeNull();
+    });
+  });
+
+  describe('notifyNewSubmission', () => {
+    const submission = { name: 'Figma', url: 'https://figma.com/education', categoryName: 'Design & Creative' };
+
+    it('builds a message with the name, link, and review URL', () => {
+      const text = buildNewSubmissionMessage(submission, 'https://site.example/admin');
+      expect(text).toContain('Figma (Design & Creative)');
+      expect(text).toContain('https://figma.com/education');
+      expect(text).toContain('https://site.example/admin');
+    });
+
+    it('skips silently when no webhook is configured', async () => {
+      const result = await notifyNewSubmission(submission, 'https://site.example/admin', { webhookUrl: null });
+      expect(result.sent).toBe(false);
+    });
+
+    it('POSTs the message to the webhook', async () => {
+      const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+      const result = await notifyNewSubmission(submission, 'https://site.example/admin', {
+        webhookUrl: 'https://hooks.example/subs',
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+      expect(result).toEqual({ sent: true });
+      const [url, init] = fetchImpl.mock.calls[0];
+      expect(url).toBe('https://hooks.example/subs');
+      expect(JSON.parse(init.body).text).toContain('Figma');
     });
   });
 });

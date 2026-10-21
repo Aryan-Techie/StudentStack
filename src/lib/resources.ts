@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { MOCK_CATEGORIES, MOCK_RESOURCES } from "./mock-data";
 import { normalizePagination, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./pagination";
 import type { ResourceEligibility } from "@/db/schema";
+import { urlMatchKey } from "./submissions";
 
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE };
 export type { ResourceEligibility };
@@ -603,14 +604,18 @@ export async function countPendingByUser(userId: string): Promise<number> {
   return Number(row.count);
 }
 
-// Compares case-insensitively and ignores trailing slashes, so
-// "https://figma.com/education/" and "https://Figma.com/education" match.
+// Matches on urlMatchKey(): ignores case, protocol, a leading "www.", the
+// #fragment, and trailing slashes, so "http://www.Figma.com/education/" and
+// "https://figma.com/education" are the same offer. The SQL below mirrors
+// urlMatchKey() in src/lib/submissions.ts.
 export async function isUrlListed(url: string): Promise<boolean> {
-  const needle = url.toLowerCase().replace(/\/+$/, "");
+  const needle = urlMatchKey(url);
   const [row] = await db
     .select({ id: resources.id })
     .from(resources)
-    .where(sql`lower(rtrim(${resources.url}, '/')) = ${needle}`)
+    .where(
+      sql`rtrim(regexp_replace(regexp_replace(lower(${resources.url}), '^https?://(www\\.)?', ''), '#.*$', ''), '/') = ${needle}`,
+    )
     .limit(1);
   return Boolean(row);
 }

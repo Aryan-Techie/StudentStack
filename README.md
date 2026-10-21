@@ -38,6 +38,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Opportunities alongside perks** — each resource has a `kind` (`perk`, `scholarship`, `fellowship`, `internship`, `mentorship`, `program`) plus optional opens-at date, deadline, recurrence, amount, provider, and structured eligibility, all editable in `/admin`.
 - **Student submission flow** at `/submit` (Google or email-link sign-in via Supabase Auth); submissions stay hidden until approved from the review queue in `/admin`.
 - **Side-by-side comparisons** at `/compare` — hand-picked sets of overlapping offers (cloud credits, AI coding assistants, design tools) shown as one table: what you get, cost type, verification, credit card, duration, region, platforms, and claim link. Resource pages link to every set they appear in.
+- **Duplicate-aware submissions** — `/submit` rejects a link that is already listed or waiting for review, even when it differs only by `http`/`https`, a leading `www.`, letter case, a `#fragment`, or a trailing slash. An optional webhook (`SUBMISSIONS_WEBHOOK_URL`) pings the admin when a new submission arrives.
 
 ---
 
@@ -129,6 +130,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY= # server-only, used by scripts/create-admin.ts
 ADMIN_EMAIL=               # the one account allowed into /admin
 CRON_SECRET=               # Vercel Cron sends this as a Bearer token
+SUBMISSIONS_WEBHOOK_URL=   # optional: Slack/JSON webhook pinged on each new /submit entry; falls back to LINK_HEALTH_WEBHOOK_URL
 ```
 
 ### 3. Install, Migrate, and Seed

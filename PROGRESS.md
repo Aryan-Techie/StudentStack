@@ -77,6 +77,37 @@ Side-by-side tables for offers that overlap (PRD §8.9).
 6. **Footer links wrap.** Adding "Compare" pushed the footer nav toward
    the edge at 390px, so footer links now wrap on narrow screens. The
    header nav is unchanged.
+## Issue #35 — Community submissions: duplicates and admin notification
+
+The `/submit` flow already existed; this issue tightened it.
+
+- **Stricter duplicate detection.** `urlMatchKey()` in
+  `src/lib/submissions.ts` reduces a link to a comparison key: lowercase,
+  no `http://`/`https://`, no leading `www.`, no `#fragment`, no trailing
+  slash. `isUrlListed()` in `src/lib/resources.ts` applies the same
+  normalization in SQL (`regexp_replace` + `rtrim`) against every row,
+  approved or pending, so `http://www.Figma.com/education/` is caught as a
+  duplicate of `https://figma.com/education`. Query strings are kept on
+  purpose: `?ref=` style parameters sometimes point at a different offer.
+- **Admin notification.** `notifyNewSubmission()` in
+  `src/lib/admin-notify.ts` posts a short message (name, category, link,
+  `/admin` review URL) to `SUBMISSIONS_WEBHOOK_URL`, falling back to
+  `LINK_HEALTH_WEBHOOK_URL` so one Slack channel can take both. It runs in
+  `after()`, so a slow or failing webhook never delays the student's
+  response. Unset means no notification; the queue in `/admin` still shows
+  the row. The webhook POST is now shared with the link-health summary.
+- **Tests.** The `submissions.ts` self-check block (`npx tsx ...`) moved to
+  `src/lib/submissions.test.ts` so it runs under `pnpm test`.
+
+### Judgment calls (Issue #35)
+
+- **Two normalizations kept in sync by hand.** The JS key and the SQL
+  expression must match. A generated column or a unique index on the
+  normalized URL would remove the duplication and also close the
+  check-then-insert race; left for later, since admin review catches the
+  rare double send.
+- **Webhook, not email.** Same reasoning as the link-health summary: no
+  email infrastructure yet, and a webhook needs no new dependency.
 
 ## Status: Phase 2 (PRD §13) — done
 

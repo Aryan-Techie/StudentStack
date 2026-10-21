@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { db, schema } from "@/db";
 import { countPendingByUser, getCategories, isUrlListed } from "@/lib/resources";
 import { slugify, validateSubmission, type SubmissionErrors } from "@/lib/submissions";
 import { assertPublicUrl } from "@/lib/ssrf";
+import { notifyNewSubmission } from "@/lib/admin-notify";
+import { getSiteUrl } from "@/lib/site";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const MAX_PENDING_PER_STUDENT = 5;
@@ -131,6 +134,17 @@ export async function submitResource(_prev: SubmitState, formData: FormData): Pr
     status: "active",
     approved: false,
     submittedBy: user.id,
+  });
+
+  // Tell the admin a submission is waiting (opt-in webhook). Runs after the
+  // response so a slow or failing webhook never delays the student.
+  const categoryName = categories.find((c) => c.id === offer.categoryId)?.name;
+  after(async () => {
+    const result = await notifyNewSubmission(
+      { name: offer.name, url: offer.url, categoryName },
+      `${getSiteUrl()}/admin`,
+    );
+    if (!result.sent) console.log(`[submit] admin notification skipped: ${result.reason}`);
   });
 
   revalidatePath("/admin");
