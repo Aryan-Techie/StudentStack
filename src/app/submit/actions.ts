@@ -8,6 +8,7 @@ import { db, schema } from "@/db";
 import { countPendingByUser, getCategories, isUrlListed } from "@/lib/resources";
 import { slugify, validateSubmission, type SubmissionErrors } from "@/lib/submissions";
 import { assertPublicUrl } from "@/lib/ssrf";
+import { safeNextPath } from "@/lib/auth-redirect";
 import { notifyNewSubmission } from "@/lib/admin-notify";
 import { getSiteUrl } from "@/lib/site";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -16,12 +17,15 @@ const MAX_PENDING_PER_STUDENT = 5;
 const SUBMISSION_FIELDS = ["name", "url", "tagline", "description", "categoryId", "costType", "region"] as const;
 
 // Supabase only redirects to URLs on the project's allow list, so building the
-// callback from the request's own origin can't send anyone off-site.
-async function callbackUrl(): Promise<string> {
+// callback from the request's own origin can't send anyone off-site. `next`
+// lets /my-list reuse this sign-in flow (issue #33); safeNextPath keeps it
+// same-site.
+async function callbackUrl(next: FormDataEntryValue | null): Promise<string> {
   const h = await headers();
   const origin =
     h.get("origin") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
-  return `${origin}/auth/callback?next=/submit`;
+  const path = safeNextPath(typeof next === "string" ? next : null);
+  return `${origin}/auth/callback?next=${encodeURIComponent(path)}`;
 }
 
 export type EmailSignInState = { status: "idle" | "sent" | "error"; message?: string; email?: string };
@@ -35,7 +39,7 @@ export async function signInWithEmail(_prev: EmailSignInState, formData: FormDat
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: await callbackUrl() },
+    options: { emailRedirectTo: await callbackUrl(formData.get("next")) },
   });
 
   if (error) {
@@ -48,20 +52,25 @@ export async function signInWithEmail(_prev: EmailSignInState, formData: FormDat
   return { status: "sent", email };
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(formData: FormData) {
+  const next = formData.get("next");
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: await callbackUrl() },
+    options: { redirectTo: await callbackUrl(next) },
   });
-  if (error || !data.url) redirect("/submit?error=google");
+  if (error || !data.url) {
+    const back = new URL(safeNextPath(typeof next === "string" ? next : null), "http://localhost").pathname;
+    redirect(`${back}?error=google`);
+  }
   redirect(data.url);
 }
 
-export async function signOut() {
+export async function signOut(formData?: FormData) {
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signOut();
-  redirect("/submit");
+  const next = formData?.get("next");
+  redirect(safeNextPath(typeof next === "string" ? next : null));
 }
 
 export type SubmitState = {

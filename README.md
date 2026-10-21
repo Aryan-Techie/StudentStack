@@ -39,6 +39,7 @@ StudentStack is a student-first resource directory for finding useful software, 
 - **Student submission flow** at `/submit` (Google or email-link sign-in via Supabase Auth); submissions stay hidden until approved from the review queue in `/admin`.
 - **Side-by-side comparisons** at `/compare` — hand-picked sets of overlapping offers (cloud credits, AI coding assistants, design tools) shown as one table: what you get, cost type, verification, credit card, duration, region, platforms, and claim link. Resource pages link to every set they appear in.
 - **Duplicate-aware submissions** — `/submit` rejects a link that is already listed or waiting for review, even when it differs only by `http`/`https`, a leading `www.`, letter case, a `#fragment`, or a trailing slash. An optional webhook (`SUBMISSIONS_WEBHOOK_URL`) pings the admin when a new submission arrives.
+- **Bookmarks and application tracker** — the bookmark icon on every directory card and on `/r/[slug]` saves an offer to `/my-list`, where students track each one as Interested, Applied, Got it, or Rejected. Signed-out students are sent to sign in (same Google / email-link flow as `/submit`) and the offer is saved when they come back.
 
 ---
 
@@ -67,6 +68,8 @@ src/
 │   ├── admin/                             # Login + dashboard (Supabase Auth-gated)
 │   ├── submit/                            # Student submission flow
 │   ├── compare/                           # /compare index and /compare/[set] side-by-side tables
+│   ├── my-list/                           # Saved offers + application tracker (sign-in required)
+│   ├── api/bookmarks/route.ts             # Signed-in student's bookmark statuses (used by cards)
 │   └── api/cron/link-health/route.ts      # Weekly link-health check
 ├── components/
 │   ├── directory/                         # Search, filters, cards, loading UI
@@ -265,7 +268,7 @@ Any platform that supports Node.js 20+ and can run `pnpm build && pnpm start` wi
 
 ## Current Scope
 
-The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. The schema already includes tables for bookmarks, reviews, and click events, but those flows aren't exposed in the UI yet — they're planned for a future phase that extends the existing Supabase Auth setup to real user accounts. Multi-admin roles remain out of scope for now.
+The current implementation focuses on fast discovery, trustworthy resource metadata, and low-effort admin curation. Bookmarks are exposed through `/my-list`. The schema already includes tables for reviews and click events, but those flows aren't exposed in the UI yet — they're planned for a future phase that extends the existing Supabase Auth setup to real user accounts. Multi-admin roles remain out of scope for now.
 
 ---
 

@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Next.js 16 renamed `middleware.ts` to `proxy.ts`. This refreshes the Supabase
-// session cookie on admin routes and /submit, and does the optimistic admin
+// session cookie on admin routes, /submit, and /my-list, and does the optimistic admin
 // redirect. It is not the security boundary: admin Server Actions re-check
 // with verifyAdmin() and submission actions re-check the signed-in user.
 export default async function proxy(request: NextRequest) {
@@ -43,5 +43,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/submit"],
+  matcher: ["/admin/:path*", "/submit", "/my-list"],
 };

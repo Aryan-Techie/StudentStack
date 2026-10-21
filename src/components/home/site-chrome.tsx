@@ -51,6 +51,9 @@ export function SiteHeader({}: { total?: number } = {}) {
             <Link href="/compare" className={styles.navLink}>
               Compare
             </Link>
+            <Link href="/my-list" className={styles.navLink}>
+              My list
+            </Link>
             <a href="#passes-title" className={styles.navLink}>
               How it works
             </a>
@@ -98,6 +101,13 @@ export function SiteHeader({}: { total?: number } = {}) {
             onClick={() => setMenuOpen(false)}
           >
             Compare
+          </Link>
+          <Link
+            href="/my-list"
+            className={styles.mobileMenuLink}
+            onClick={() => setMenuOpen(false)}
+          >
+            My list
           </Link>
           <a
             href="#passes-title"

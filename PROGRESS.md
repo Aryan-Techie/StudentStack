@@ -108,6 +108,52 @@ The `/submit` flow already existed; this issue tightened it.
   rare double send.
 - **Webhook, not email.** Same reasoning as the link-health summary: no
   email infrastructure yet, and a webhook needs no new dependency.
+## Issue #33 — Bookmarks and application tracker
+
+PRD §8.7: save any resource and track where you are with it. Uses the
+existing `bookmarks` table (primary key `(user_id, resource_id)`, status
+`interested | applied | got_it | rejected`); no schema change.
+
+- **Saving.** The bookmark icon on directory cards, which did nothing
+  before, is now `BookmarkButton` (`src/components/bookmarks/`); the same
+  button sits next to Claim on `/r/[slug]`. Signed out, it is a link to
+  `/my-list?save=<id>`; after sign-in `PendingSave` finishes the save and
+  drops the query param. Signed in, one click saves as Interested; a saved
+  icon opens a popover with the four status pills, Remove, and a link to
+  `/my-list`.
+- **`/my-list`.** Saved resources grouped by status, with inline status
+  pills and Remove (`useOptimistic`). Each row shows the deadline, the
+  offer link, and a note when the offer is expired or broken. Unapproved
+  resources are filtered out, so an offer an admin un-approves drops off
+  the list. The page checks the session itself; `proxy.ts` only refreshes
+  the cookie (`/my-list` added to its matcher).
+- **Server side.** `src/lib/bookmarks.ts` (`server-only`) holds the
+  queries; `src/app/my-list/actions.ts` has `saveBookmark` /
+  `removeBookmark`, which re-check the Supabase session, validate their
+  arguments, and only allow approved resources. Saving again upserts on
+  the primary key.
+- **Sign-in reuse.** `SignInPanel` and the sign-in actions take a `next`
+  path (checked with `safeNextPath`), so `/my-list` reuses the `/submit`
+  Google and email-link flow. A failed callback returns to whichever page
+  started the sign-in.
+- "My list" added to the header and mobile nav.
+
+### Judgment calls (Issue #33)
+
+- **Statuses load client-side.** `BookmarksProvider` fetches
+  `GET /api/bookmarks` once per page and applies changes optimistically,
+  rolling back if the action fails. `/directory` stays a shared,
+  non-personalized server render, so the proxy doesn't have to run on
+  every directory request. A Route Handler can also write refreshed
+  session cookies, which a Server Component render can't.
+- **`server-only` in tests.** `vitest.config.ts` aliases `server-only` to
+  Next's empty stub so client components that import Server Actions can be
+  unit tested.
+- **Signed-in flow is unit-tested only.** Without a Supabase project
+  locally, the signed-in states and `/my-list` itself weren't exercised in
+  a browser; `/my-list` and `/submit` both return 500 when
+  `NEXT_PUBLIC_SUPABASE_URL` is unset. `/api/bookmarks` answers
+  `signedIn: false` in that case, so cards still render.
 
 ## Status: Phase 2 (PRD §13) — done
 

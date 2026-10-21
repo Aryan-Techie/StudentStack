@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { DirectoryClient } from "@/components/directory/directory-client";
 import { DirectorySkeleton } from "@/components/directory/directory-skeleton";
+import { BookmarksProvider } from "@/components/bookmarks/bookmarks-provider";
 import { SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
 import { getAllResources, getAllTags, getCategories, getResourceCount } from "@/lib/resources";
@@ -70,7 +71,9 @@ export default async function DirectoryPage({
             </div>
           </section>
           <Suspense fallback={<DirectorySkeleton />}>
-            <DirectoryClient resources={resources} categories={categories} allTags={allTags} />
+            <BookmarksProvider>
+              <DirectoryClient resources={resources} categories={categories} allTags={allTags} />
+            </BookmarksProvider>
           </Suspense>
         </main>
       </div>
