@@ -82,7 +82,9 @@ pnpm test:coverage
 
 Vitest discovers `src/**/*.test.{ts,tsx}` and uses jsdom with
 [`vitest.setup.ts`](vitest.setup.ts). Put regression tests next to the affected
-code and avoid requiring live services for unit tests. Coverage thresholds are
+code and avoid requiring live services for unit tests. For code that queries
+the database, mock `@/db` with the in-memory fake in
+[`src/test/fake-db.ts`](src/test/fake-db.ts) (see `src/lib/resources.test.ts`). Coverage thresholds are
 configured in [`vitest.config.ts`](vitest.config.ts). Use `pnpm test:watch` during
 development.
 

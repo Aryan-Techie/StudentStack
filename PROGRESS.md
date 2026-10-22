@@ -3,6 +3,28 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #115 — Unit test coverage above the 80% thresholds
+
+`pnpm test:coverage` now passes all four thresholds (it was about 74%
+statements / 72% branches / 65% functions / 76% lines). The thresholds and
+excludes in `vitest.config.ts` are unchanged; the gain comes from new tests
+for the DB-backed data layer (`src/lib/resources.ts`, `bookmarks.ts`,
+`profiles.ts`), the Server Actions in `/my-list`, `/submit`, and
+`/onboarding`, the bookmarks, profile, reports, and click route handlers,
+the GitHub and Apify ingestion sources, the Supabase server client, and the
+report-a-problem control.
+
+- **Fake database.** `src/test/fake-db.ts` stands in for the Drizzle `db`
+  export: every query chain is recorded, and awaiting it returns the next
+  queued result (or rejects, when an Error is queued). Tests use it through
+  `vi.mock("@/db", ...)` with the real schema, so they assert on mapping,
+  validation, and fallbacks without Postgres. Judgment call: it doesn't
+  interpret the SQL, so a wrong `where` clause still needs an integration or
+  E2E check.
+- Coverage only counts files that some test imports, so untested modules
+  (most pages and admin actions) aren't in the denominator yet. Covering
+  them will lower the percentage before it raises it.
+
 ## Issue #118 — Past deadlines labelled "today"; search placeholder ignores eligibility
 
 - **Deadline label.** `relativeDeadline()` rounded the distance to whole days,
