@@ -7,7 +7,7 @@ import { DirectorySkeleton } from "@/components/directory/directory-skeleton";
 import { SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
 import { getAllResources, getAllTags, getCategories, getResourceCount } from "@/lib/resources";
-import { applyFilters } from "@/lib/directory-filters";
+import { applyFilters, searchPlaceholder } from "@/lib/directory-filters";
 import { getPreset, fullFilters, PRESETS } from "@/lib/presets";
 import dirStyles from "@/components/directory/directory.module.css";
 import homeStyles from "@/components/home/brand.module.css";
@@ -87,9 +87,10 @@ export default async function PresetPage({
               <label htmlFor="preset-search" className="sr-only">Search offers</label>
               <input
                 id="preset-search"
+                data-directory-search
                 name="q"
                 type="search"
-                placeholder={`Search ${count} offers...`}
+                placeholder={searchPlaceholder(count)}
                 className={dirStyles.searchInput}
               />
               <button type="submit" className={dirStyles.searchBtn}>Search</button>

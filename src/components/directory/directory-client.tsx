@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { X, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { applyFilters, countByCategory, countByKind, countByRegion, demoteBroken, statusRank, topTags, type DirectoryFilters, type RegionFilter } from "@/lib/directory-filters";
+import { applyFilters, countByCategory, countByKind, countByRegion, demoteBroken, searchPlaceholder, statusRank, topTags, type DirectoryFilters, type RegionFilter } from "@/lib/directory-filters";
 import type { Category, Resource, ResourceKind } from "@/lib/resources";
 import { FilterPanel } from "./filter-panel";
 import { MobileFilterSheet } from "./mobile-filter-sheet";
@@ -106,10 +106,25 @@ export function DirectoryClient({
   // toggle narrows the pool every filter, facet count, and search runs on.
   const { signals: profile, eligibility, saveEligibility, eligibleOnly, setEligibleOnly } = useViewerProfile();
   const [eligibilityOpen, setEligibilityOpen] = useState(false);
+  const eligibleFilterOn = eligibleOnly && Boolean(eligibility);
   const resources = useMemo(
     () => (eligibleOnly && eligibility ? allResources.filter((r) => isEligible(r, eligibility)) : allResources),
     [allResources, eligibleOnly, eligibility],
   );
+  // The hero search form is server-rendered (a plain GET form) with the
+  // total in its placeholder. While the eligibility toggle narrows the pool,
+  // point its placeholder at the eligible count too, and put the server's
+  // text back when the toggle goes off (issue #118).
+  useEffect(() => {
+    if (!eligibleFilterOn) return;
+    const hero = document.querySelector<HTMLInputElement>("input[data-directory-search]");
+    if (!hero) return;
+    const serverPlaceholder = hero.placeholder;
+    hero.placeholder = searchPlaceholder(resources.length, true);
+    return () => {
+      hero.placeholder = serverPlaceholder;
+    };
+  }, [eligibleFilterOn, resources.length]);
 
   // Deliberately NOT reading localStorage here. This component is
   // server-rendered for the initial HTML, and `localStorage` doesn't exist
@@ -602,7 +617,7 @@ useKeyboardShortcuts({
       <div className={styles.mobileBar}>
        <input
   ref={searchInputRef}
-  placeholder="Search offers..."
+  placeholder={searchPlaceholder(resources.length, eligibleFilterOn)}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -732,7 +747,7 @@ useKeyboardShortcuts({
             <input
               type="checkbox"
               role="switch"
-              checked={eligibleOnly && Boolean(eligibility)}
+              checked={eligibleFilterOn}
               onChange={(e) => {
                 if (e.target.checked && !eligibility) setEligibilityOpen(true);
                 else setEligibleOnly(e.target.checked);

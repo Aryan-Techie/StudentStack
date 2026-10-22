@@ -27,6 +27,13 @@ export function worksInIndia(r: Pick<Resource, "region" | "regions" | "regionLoc
   return r.regions.includes("IN") || !r.regionLocked || r.region === "IN";
 }
 
+// Placeholder for the directory search inputs. `count` is the pool being
+// searched: with "Only what I'm eligible for" on, that's the eligible
+// subset, not every offer (issue #118).
+export function searchPlaceholder(count: number, eligibleOnly = false): string {
+  return `Search ${count} ${eligibleOnly ? "eligible " : ""}${count === 1 ? "offer" : "offers"}...`;
+}
+
 export type DirectoryFilters = {
   search: string;
   category: string[];

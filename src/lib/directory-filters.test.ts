@@ -8,6 +8,7 @@ import {
   countByRegion,
   demoteBroken,
   resourceKind,
+  searchPlaceholder,
   statusRank,
   topTags,
   sortResources,
@@ -655,5 +656,20 @@ describe("parseEligibilityProfile", () => {
     expect(
       parseEligibilityProfile({ country: "us", level: "PhD", year: 9, field: "ECE", hasEduEmail: true, hasStudentId: "yes" }),
     ).toEqual({ country: "US", level: "PhD", field: "ECE", hasEduEmail: true });
+  });
+});
+
+describe("searchPlaceholder (issue #118)", () => {
+  it("counts every offer by default", () => {
+    expect(searchPlaceholder(42)).toBe("Search 42 offers...");
+  });
+
+  it("counts only the eligible pool when the toggle is on", () => {
+    expect(searchPlaceholder(7, true)).toBe("Search 7 eligible offers...");
+  });
+
+  it("uses the singular for one offer", () => {
+    expect(searchPlaceholder(1)).toBe("Search 1 offer...");
+    expect(searchPlaceholder(1, true)).toBe("Search 1 eligible offer...");
   });
 });
