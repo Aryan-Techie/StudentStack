@@ -123,6 +123,13 @@ export function SiteHeader({}: { total?: number } = {}) {
           >
             FAQs
           </a>
+          <Link
+            href="/submit"
+            className={`${styles.mobileMenuLink} ${styles.mobileMenuSubmit}`}
+            onClick={() => setMenuOpen(false)}
+          >
+            Add a perk
+          </Link>
         </div>
       )}
     </header>

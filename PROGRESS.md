@@ -3,6 +3,23 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #116 — Header overflows phone width
+
+- **Cause.** The header row never wraps, and neither the wordmark (`flex: none`)
+  nor the nav could shrink, so below about 424px the nav ran past the edge.
+  `.barInner` has `overflow: hidden` (for the floating capsule), which hid the
+  overflow by clipping the menu button instead of showing a scrollbar.
+- **Fix.** At 480px and below, "Add a perk" moves from the header into the
+  mobile menu and the wordmark drops to 0.875rem. The wordmark is now the only
+  header item that can shrink, so the menu button stays on screen at any width.
+  Judgment call: the 480px breakpoint leaves some room above the ~424px where
+  the pill stops fitting, in case the fallback font renders wider. Desktop and
+  tablet layouts are unchanged.
+- **Other sideways scroll at phone widths.** The homepage's 400px card glow is
+  now capped at its container's width, and the directory's one-column grid uses
+  `minmax(0, 1fr)` (like its 2- and 3-column rules), so a long card no longer
+  widens the page to 488px. `e2e/mobile-header.spec.ts` checks 320px and 390px.
+
 ## Issue #114 — E2E suite fails on main
 
 `pnpm test:e2e` failed 45 of 55 tests on a checkout without `.env.local`.

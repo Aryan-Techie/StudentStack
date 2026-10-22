@@ -177,7 +177,11 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   text-decoration: none;
-  flex: none;
+  /* The wordmark is the only header item allowed to give up width, so the
+     nav (and its menu button) can never be pushed past the edge. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 .nav {
   display: flex;
@@ -211,6 +215,22 @@
 @media (max-width: 768px) {
   .mobileMenuBtn {
     display: inline-flex;
+  }
+}
+/* "Add a perk" only fits beside the wordmark from about 424px; on narrower
+   phones it moves into the mobile menu. */
+.mobileMenuDropdown .mobileMenuSubmit {
+  display: none;
+}
+@media (max-width: 480px) {
+  .barInner .pillLink {
+    display: none;
+  }
+  .mobileMenuDropdown .mobileMenuSubmit {
+    display: flex;
+  }
+  .barInner .wordmark {
+    font-size: 0.875rem;
   }
 }
 .mobileMenuDropdown {
@@ -440,7 +460,7 @@
   bottom: -24px;
   left: 50%;
   transform: translateX(-50%);
-  width: 400px;
+  width: min(400px, 100%);
   height: 90px;
   background: radial-gradient(ellipse at center, rgba(255, 154, 0, 0.28) 0%, transparent 70%);
   pointer-events: none;
