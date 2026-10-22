@@ -1,5 +1,6 @@
 /* Sleek dark-mode directory styling. Clean typography, restrained scale, no emojis or em-dashes. */
-.root {
+.root,
+.dialog {
   --d-ground: #09090b;
   --d-surface: #121215;
   --d-surface-hover: #17171c;
@@ -18,12 +19,16 @@
   --d-mint: #6ee7b7;
   --d-mint-bg: rgba(110, 231, 183, 0.1);
   --d-green: #4ade80;
+}
+
+.root {
   background: var(--d-ground);
   color: var(--d-ink);
   min-height: 100vh;
 }
 
-:global(.light) .root {
+:global(.light) .root,
+:global(.light) .dialog {
   --d-ground: #ffffff;
   --d-surface: #f7f7f9;
   --d-surface-hover: #efeff2;
@@ -33,6 +38,33 @@
   --d-ink: #111418;
   --d-ink-secondary: #27272a;
   --d-muted: #71717a;
+}
+
+/* Dialogs render in a portal on <body>, outside .root, so they don't inherit
+   the palette above and fell back to the global shadcn tokens (a light panel
+   on the dark directory). .dialog declares the palette itself (above) and
+   maps the shadcn tokens dialog.tsx and its contents use onto it. */
+.dialog {
+  --popover: var(--d-surface);
+  --popover-foreground: var(--d-ink);
+  --foreground: var(--d-ink);
+  --background: var(--d-ground);
+  --muted: var(--d-surface-subtle);
+  --muted-foreground: var(--d-muted);
+  --accent: var(--d-surface-hover);
+  --accent-foreground: var(--d-ink);
+  --secondary: var(--d-surface-subtle);
+  --secondary-foreground: var(--d-ink);
+  --border: var(--d-line-hover);
+  --input: var(--d-line-hover);
+  --ring: var(--d-purple);
+  /* Native selects, their option lists, and checkboxes follow the palette too. */
+  color-scheme: dark;
+  accent-color: var(--d-purple);
+}
+
+:global(.light) .dialog {
+  color-scheme: light;
 }
 
 .wrap {

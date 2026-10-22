@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import styles from "./directory.module.css";
 
 const SHORTCUTS: { keys: string; description: string }[] = [
   { keys: "/", description: "Focus search" },
@@ -26,7 +27,7 @@ export function ShortcutsHelp({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className={`max-w-sm ${styles.dialog}`}>
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
         </DialogHeader>
