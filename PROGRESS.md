@@ -3,6 +3,28 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #117 — Dialogs render with the light theme on dark pages
+
+- **Cause.** The directory's `--d-*` palette is declared on its `.root`, but
+  Radix dialogs render in a portal on `<body>`, outside `.root`. They fell back
+  to the global shadcn `--popover` tokens, which are light unless `<html>` has
+  `.dark`, so in light mode the dialogs were light panels on the dark directory.
+- **Fix.** `directory.module.css` now declares the palette on `.root` and on a
+  `.dialog` class, and `.dialog` maps the shadcn tokens that `dialog.tsx` and
+  the dialog contents use (`--popover`, `--foreground`, `--muted-foreground`,
+  `--border`, `--input`, ...) onto `--d-*`. It also sets `color-scheme` so native
+  selects, option lists, and checkboxes match. The card description dialog, the
+  eligibility sheet, and the keyboard-shortcuts dialog use it.
+- **Judgment calls.** The directory body is dark with either site theme. The
+  toggle only sets `.dark`, and nothing sets the `.light` class that
+  `directory.module.css` overrides, so in both modes the dialogs match the
+  dark directory. `.dialog` is included in that `.light` override, so dialogs
+  will follow if the directory ever gets a light mode. `dialog.tsx` itself is
+  unchanged. The mobile filter sheet already hard-codes the dark palette, and
+  `resource-detail-dialog.tsx` is only used by the unused `resource-row.tsx`,
+  so neither was touched. Popovers (bookmark, tag filter) have the same portal
+  issue and are left for a follow-up.
+
 ## Issue #115 — Unit test coverage above the 80% thresholds
 
 `pnpm test:coverage` now passes all four thresholds (it was about 74%
