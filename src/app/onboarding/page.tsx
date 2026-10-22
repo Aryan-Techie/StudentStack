@@ -7,6 +7,7 @@ import { safeNextPath } from "@/lib/auth-redirect";
 import { BRANCHES, YEARS } from "@/lib/personalization";
 import { getProfile } from "@/lib/profiles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { completeOnboarding } from "./actions";
 
 export const metadata: Metadata = {
@@ -19,6 +20,8 @@ export const metadata: Metadata = {
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next: nextRaw } = await searchParams;
   const next = safeNextPath(nextRaw, "/directory");
+  // No Supabase means no signed-in student; /my-list explains why (#127).
+  if (!isSupabaseConfigured()) redirect("/my-list");
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

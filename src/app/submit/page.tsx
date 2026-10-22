@@ -4,6 +4,8 @@ import { SiteFooter, SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
 import { getCategories, getSubmissionsByUser, type UserSubmission } from "@/lib/resources";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { SignInUnavailable } from "@/components/auth/sign-in-unavailable";
 import { signOut } from "./actions";
 import { SignInPanel } from "./sign-in-panel";
 import { SubmitForm } from "./submit-form";
@@ -28,10 +30,12 @@ function submissionStatus(submission: UserSubmission): { label: string; live: bo
 
 export default async function SubmitPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Without Supabase there's no one to sign in (issue #127): render the page
+  // signed out, with a notice in place of the sign-in panel.
+  const authConfigured = isSupabaseConfigured();
+  const user = authConfigured
+    ? (await (await createServerSupabaseClient()).auth.getUser()).data.user
+    : null;
 
   const [categories, submissions] = user
     ? await Promise.all([getCategories(), getSubmissionsByUser(user.id)])
@@ -77,8 +81,10 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
               </div>
               <SubmitForm categories={categories} />
             </>
-          ) : (
+          ) : authConfigured ? (
             <SignInPanel />
+          ) : (
+            <SignInUnavailable />
           )}
         </div>
       </main>

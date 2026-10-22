@@ -7,6 +7,8 @@ import { getSavedResources } from "@/lib/bookmarks";
 import { getProfile } from "@/lib/profiles";
 import { getSiteUrl } from "@/lib/site";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { SignInUnavailable } from "@/components/auth/sign-in-unavailable";
 import { signOut } from "../submit/actions";
 import { enableCalendarFeed, resetCalendarFeed, setDigestPreference } from "./actions";
 import { SignInPanel } from "../submit/sign-in-panel";
@@ -32,10 +34,11 @@ export default async function MyListPage({
   searchParams: Promise<{ error?: string; save?: string }>;
 }) {
   const { error, save } = await searchParams;
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Without Supabase there's no one to sign in (issue #127).
+  const authConfigured = isSupabaseConfigured();
+  const user = authConfigured
+    ? (await (await createServerSupabaseClient()).auth.getUser()).data.user
+    : null;
 
   const pendingSave = Number(save);
   const nextPath = Number.isInteger(pendingSave) && pendingSave > 0 ? `/my-list?save=${pendingSave}` : "/my-list";
@@ -59,11 +62,15 @@ export default async function MyListPage({
                 {signInError}
               </p>
             )}
-            <SignInPanel
-              next={nextPath}
-              title="Sign in to save offers"
-              hint="Your list is private. Your name and email aren’t shown anywhere on the site."
-            />
+            {authConfigured ? (
+              <SignInPanel
+                next={nextPath}
+                title="Sign in to save offers"
+                hint="Your list is private. Your name and email aren’t shown anywhere on the site."
+              />
+            ) : (
+              <SignInUnavailable />
+            )}
           </div>
         </main>
         <SiteFooter />
