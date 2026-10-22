@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/home/site-chrome";
 import { passFontVariables } from "@/lib/fonts";
 import { getAllResources, getAllTags, getCategories, getResourceCount } from "@/lib/resources";
 import { PRESETS } from "@/lib/presets";
+import { searchPlaceholder } from "@/lib/directory-filters";
 import { getRatingSummaries } from "@/lib/reviews";
 import { getGotItCounts } from "@/lib/bookmarks";
 import dirStyles from "@/components/directory/directory.module.css";
@@ -60,10 +61,11 @@ export default async function DirectoryPage({
               <label htmlFor="dir-search" className="sr-only">Search offers</label>
               <input
                 id="dir-search"
+                data-directory-search
                 name="q"
                 type="search"
                 defaultValue={q ?? ""}
-                placeholder={`Search ${count} offers...`}
+                placeholder={searchPlaceholder(count)}
                 className={dirStyles.searchInput}
               />
               <button type="submit" className={dirStyles.searchBtn}>Search</button>

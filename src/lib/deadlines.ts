@@ -58,10 +58,15 @@ export function partitionDeadlines(
   return buckets;
 }
 
+// Pinned to UTC: deadlines are stored as UTC instants (curated ones at
+// 12:00 UTC, ingested ones at end-of-day UTC), the .ics/.rss feeds use the
+// UTC date, and the card renders on the server and again on the client, so
+// the machine's local zone must not shift the printed day (issue #118).
 const DATE_FORMAT = new Intl.DateTimeFormat("en", {
   month: "short",
   day: "numeric",
   year: "numeric",
+  timeZone: "UTC",
 });
 
 export function formatDeadline(deadlineMs: number): string {
@@ -69,9 +74,18 @@ export function formatDeadline(deadlineMs: number): string {
 }
 
 const RELATIVE_FORMAT = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+const HOUR_MS = 3_600_000;
 
-// "in 5 days" / "tomorrow" / "3 days ago" — the human line under each card.
+// "in 5 days" / "tomorrow" / "today" for open deadlines; "closed 3 hours
+// ago" / "closed yesterday" / "closed 4 days ago" once passed. Uses elapsed
+// time, not calendar days, so the label is the same in every time zone, and
+// a passed deadline never rounds to "today" (issue #118).
 export function relativeDeadline(deadlineMs: number, nowMs: number = Date.now()): string {
-  const days = Math.round((deadlineMs - nowMs) / DAY_MS);
-  return RELATIVE_FORMAT.format(days, "day");
+  if (!isPastDeadline(deadlineMs, nowMs)) {
+    return RELATIVE_FORMAT.format(Math.round((deadlineMs - nowMs) / DAY_MS), "day");
+  }
+  const elapsed = nowMs - deadlineMs;
+  if (elapsed < HOUR_MS) return "closed just now";
+  if (elapsed < DAY_MS) return `closed ${RELATIVE_FORMAT.format(-Math.floor(elapsed / HOUR_MS), "hour")}`;
+  return `closed ${RELATIVE_FORMAT.format(-Math.floor(elapsed / DAY_MS), "day")}`;
 }

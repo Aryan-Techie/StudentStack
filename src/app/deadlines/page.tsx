@@ -21,7 +21,11 @@ export const dynamic = "force-dynamic";
 
 export default async function DeadlinesPage() {
   const resources = await getResourcesWithDeadlines();
-  const { closingSoon, upcoming, past } = partitionDeadlines(resources);
+  // One clock reading per request (the page is force-dynamic), shared with
+  // the client list so buckets and labels match across hydration.
+  // eslint-disable-next-line react-hooks/purity -- async Server Component, rendered once per request
+  const nowMs = Date.now();
+  const { closingSoon, upcoming, past } = partitionDeadlines(resources, nowMs);
 
   return (
     <div className={`${passFontVariables} ${homeStyles.root}`}>
@@ -48,7 +52,7 @@ export default async function DeadlinesPage() {
               </a>
             </div>
           </section>
-          <DeadlinesList closingSoon={closingSoon} upcoming={upcoming} past={past} />
+          <DeadlinesList closingSoon={closingSoon} upcoming={upcoming} past={past} nowMs={nowMs} />
         </main>
       </div>
     </div>

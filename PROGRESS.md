@@ -3,6 +3,31 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #118 — Past deadlines labelled "today"; search placeholder ignores eligibility
+
+- **Deadline label.** `relativeDeadline()` rounded the distance to whole days,
+  so anything that closed less than 12 hours ago came out as "today" under
+  "Past deadlines". Passed deadlines now read "closed just now" (first hour),
+  "closed N hours ago" (first day), then "closed yesterday" / "closed N days
+  ago". Open deadlines keep their old wording. Judgment call: the label uses
+  elapsed time rather than calendar days, so it reads the same in every time
+  zone and can't disagree between the server render and hydration.
+- **One clock per request.** `/deadlines` now reads `Date.now()` once on the
+  server and passes it to `DeadlinesList`, so the section, urgency tier, and
+  label all use the same instant, and the client's hydration pass prints
+  what the server did instead of recomputing with the browser's clock.
+- **Dates in UTC.** `formatDeadline()` is pinned to UTC, matching the .ics and
+  .rss feeds. Before, a server or browser west of UTC printed curated noon-UTC
+  dates correctly but shifted end-of-day UTC ones (ingested deadlines), and
+  the existing `Dec 25` test failed when run with `TZ=America/Los_Angeles`.
+- **Search placeholder.** With "Only what I'm eligible for" on, both directory
+  search inputs say "Search N eligible offers..." with the eligible count. The
+  hero input is part of the server-rendered GET form, so `DirectoryClient`
+  updates its placeholder from an effect (found via `data-directory-search`)
+  and restores the server text when the toggle goes off. The mobile input in
+  `DirectoryClient` now shows a count too, for consistency. Same treatment on
+  the `/[preset]` pages.
+
 ## Issue #116 — Header overflows phone width
 
 - **Cause.** The header row never wraps, and neither the wordmark (`flex: none`)

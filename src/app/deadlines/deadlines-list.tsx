@@ -29,10 +29,18 @@ const URGENCY_BADGE: Partial<Record<UrgencyTier, string>> = {
   "closing-soon": "Closing soon",
 };
 
-function DeadlineCard({ resource, showRecurrence }: { resource: Resource; showRecurrence?: boolean }) {
+function DeadlineCard({
+  resource,
+  nowMs,
+  showRecurrence,
+}: {
+  resource: Resource;
+  nowMs: number;
+  showRecurrence?: boolean;
+}) {
   const router = useRouter();
-  const closingSoon = resource.deadline !== null && isClosingSoon(resource.deadline);
-  const tier = resource.deadline !== null ? urgencyTier(resource.deadline) : "upcoming";
+  const closingSoon = resource.deadline !== null && isClosingSoon(resource.deadline, nowMs);
+  const tier = resource.deadline !== null ? urgencyTier(resource.deadline, nowMs) : "upcoming";
   const badge = URGENCY_BADGE[tier];
 
   return (
@@ -41,7 +49,7 @@ function DeadlineCard({ resource, showRecurrence }: { resource: Resource; showRe
         <p className={closingSoon ? styles.closingLine : styles.deadlineLine}>
           {badge && <span className={styles.closingBadge}>{badge}</span>}
           <span>
-            Deadline {formatDeadline(resource.deadline)} · {relativeDeadline(resource.deadline)}
+            Deadline {formatDeadline(resource.deadline)} · {relativeDeadline(resource.deadline, nowMs)}
           </span>
           {showRecurrence && resource.recurrence && (
             <span className={styles.recurrenceBadge}>Opens again ~{resource.recurrence}</span>
@@ -67,12 +75,14 @@ function DeadlineSection({
   title,
   subcopy,
   resources,
+  nowMs,
   showRecurrence,
 }: {
   id: string;
   title: string;
   subcopy?: string;
   resources: Resource[];
+  nowMs: number;
   showRecurrence?: boolean;
 }) {
   if (resources.length === 0) return null;
@@ -84,21 +94,26 @@ function DeadlineSection({
       {subcopy && <p className={styles.sectionSub}>{subcopy}</p>}
       <div className={dirStyles.grid}>
         {resources.map((resource) => (
-          <DeadlineCard key={resource.id} resource={resource} showRecurrence={showRecurrence} />
+          <DeadlineCard key={resource.id} resource={resource} nowMs={nowMs} showRecurrence={showRecurrence} />
         ))}
       </div>
     </section>
   );
 }
 
+// `nowMs` comes from the server render that bucketed these resources, so
+// the section, urgency tier, and "· in 3 days" label all agree, and the
+// client's hydration pass prints the same text the server did (issue #118).
 export function DeadlinesList({
   closingSoon,
   upcoming,
   past,
+  nowMs,
 }: {
   closingSoon: Resource[];
   upcoming: Resource[];
   past: Resource[];
+  nowMs: number;
 }) {
   if (closingSoon.length === 0 && upcoming.length === 0 && past.length === 0) {
     return (
@@ -116,8 +131,9 @@ export function DeadlinesList({
         title="Closing soon"
         subcopy={`These close within the next ${CLOSING_SOON_DAYS} days — apply now if you qualify.`}
         resources={closingSoon}
+        nowMs={nowMs}
       />
-      <DeadlineSection id="upcoming" title="Upcoming deadlines" resources={upcoming} />
+      <DeadlineSection id="upcoming" title="Upcoming deadlines" resources={upcoming} nowMs={nowMs} />
       {past.length > 0 && (
         <details className={styles.pastDetails}>
           <summary className={styles.pastSummary}>
@@ -128,7 +144,7 @@ export function DeadlinesList({
           </p>
           <div className={dirStyles.grid}>
             {past.map((resource) => (
-              <DeadlineCard key={resource.id} resource={resource} showRecurrence />
+              <DeadlineCard key={resource.id} resource={resource} nowMs={nowMs} showRecurrence />
             ))}
           </div>
         </details>

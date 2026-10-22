@@ -98,12 +98,78 @@ describe("formatDeadline", () => {
   it("formats as a short date", () => {
     expect(formatDeadline(new Date("2026-12-25T00:00:00Z").getTime())).toBe("Dec 25, 2026");
   });
+
+  it("prints the UTC date, even when it's already the next day in IST (issue #118)", () => {
+    // 23:59 UTC on Oct 20 is 05:29 IST on Oct 21; the feeds call it Oct 20.
+    expect(formatDeadline(new Date("2026-10-20T23:59:59Z").getTime())).toBe("Oct 20, 2026");
+    // 18:30 UTC is IST midnight: still Oct 20 in UTC.
+    expect(formatDeadline(new Date("2026-10-20T18:30:00Z").getTime())).toBe("Oct 20, 2026");
+  });
 });
 
+const HOUR = 3_600_000;
+
 describe("relativeDeadline", () => {
-  it("describes future and past deadlines in days", () => {
+  it("describes future deadlines in days", () => {
     expect(relativeDeadline(NOW + 5 * DAY, NOW)).toBe("in 5 days");
-    expect(relativeDeadline(NOW - 3 * DAY, NOW)).toBe("3 days ago");
+    expect(relativeDeadline(NOW + DAY, NOW)).toBe("tomorrow");
+  });
+
+  it("describes past deadlines as closed", () => {
+    expect(relativeDeadline(NOW - 3 * DAY, NOW)).toBe("closed 3 days ago");
+    expect(relativeDeadline(NOW - DAY, NOW)).toBe("closed yesterday");
+    expect(relativeDeadline(NOW - (2 * DAY - 1), NOW)).toBe("closed yesterday");
+  });
+});
+
+// Issue #118: a deadline that passed within the last day rounded to 0 days
+// and read "today" under "Past deadlines".
+describe("relativeDeadline boundaries (issue #118)", () => {
+  it("never calls a passed deadline 'today'", () => {
+    for (const elapsed of [0, 1, HOUR / 2, 3 * HOUR, 11 * HOUR, 12 * HOUR, 23 * HOUR, DAY - 1]) {
+      const label = relativeDeadline(NOW - elapsed, NOW);
+      expect(label).toMatch(/^closed /);
+      expect(label).not.toMatch(/today|in 0/);
+    }
+  });
+
+  it("reads 'closed just now' at the exact deadline and within the first hour", () => {
+    expect(relativeDeadline(NOW, NOW)).toBe("closed just now");
+    expect(relativeDeadline(NOW - (HOUR - 1), NOW)).toBe("closed just now");
+  });
+
+  it("counts hours for the rest of the first day", () => {
+    expect(relativeDeadline(NOW - HOUR, NOW)).toBe("closed 1 hour ago");
+    expect(relativeDeadline(NOW - 3 * HOUR, NOW)).toBe("closed 3 hours ago");
+    expect(relativeDeadline(NOW - (DAY - 1), NOW)).toBe("closed 23 hours ago");
+  });
+
+  it("keeps the open-deadline wording just before the deadline", () => {
+    expect(relativeDeadline(NOW + 1, NOW)).toBe("today");
+    expect(relativeDeadline(NOW + 3 * HOUR, NOW)).toBe("today");
+  });
+
+  it("agrees with isPastDeadline at the boundary", () => {
+    expect(isPastDeadline(NOW, NOW)).toBe(true);
+    expect(relativeDeadline(NOW, NOW)).toMatch(/^closed /);
+    expect(isPastDeadline(NOW + 1, NOW)).toBe(false);
+    expect(relativeDeadline(NOW + 1, NOW)).not.toMatch(/^closed /);
+  });
+
+  it("labels a curated 12:00 UTC deadline the same across IST and UTC midnight", () => {
+    const deadline = new Date("2026-10-20T12:00:00Z").getTime();
+    // 00:30 IST on Oct 21 (still Oct 20 in UTC).
+    expect(relativeDeadline(deadline, new Date("2026-10-20T19:00:00Z").getTime())).toBe(
+      "closed 7 hours ago",
+    );
+    // 00:30 UTC on Oct 21 (06:00 IST): the reported "· today" case.
+    expect(relativeDeadline(deadline, new Date("2026-10-21T00:30:00Z").getTime())).toBe(
+      "closed 12 hours ago",
+    );
+    // A full day later in either zone.
+    expect(relativeDeadline(deadline, new Date("2026-10-21T12:00:00Z").getTime())).toBe(
+      "closed yesterday",
+    );
   });
 });
 
