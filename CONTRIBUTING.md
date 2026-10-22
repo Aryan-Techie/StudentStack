@@ -89,12 +89,13 @@ pnpm exec playwright install
 pnpm test:e2e
 ```
 
-The build and browser tests need a configured development Supabase project and
-appropriate test data. Playwright discovers tests under `e2e/`, starts the
-production server with `pnpm start`, and exercises desktop and mobile browser
-projects defined in [`playwright.config.ts`](playwright.config.ts). Build first;
-`pnpm start` does not create a production build. Browser tests involving admin
-flows may need the development admin account described in the README.
+Playwright discovers tests under `e2e/`, starts the production server with
+`pnpm start`, and exercises desktop and mobile browser projects defined in
+[`playwright.config.ts`](playwright.config.ts). Build first; `pnpm start` does
+not create a production build. The suite runs without credentials: the app falls
+back to mock data, and the admin sign-in test is skipped unless
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are set.
+To run one browser, pass `--project`, for example `pnpm test:e2e --project=chromium`.
 
 If a check is blocked by missing credentials, seed input, or browser dependencies,
 say so in the PR. Do not mark it as passing. Upstream CI may require repository

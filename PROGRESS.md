@@ -3,6 +3,33 @@
 Read this first at the start of a new session, then the relevant PRD section
 for whatever phase comes next.
 
+## Issue #114 — E2E suite fails on main
+
+`pnpm test:e2e` failed 45 of 55 tests on a checkout without `.env.local`.
+
+- **Selectors.** The directory tests now look for the current heading and
+  the "Filters" sidebar (desktop) or filter sheet (mobile). The home-to-
+  directory test clicks the footer link, because the header nav collapses
+  into a menu on mobile.
+- **Proxy without Supabase.** Most of the admin failures were `proxy.ts`
+  throwing when it built a Supabase client with no URL or key, which made
+  every matched route a 500. It now treats that case as signed out, like
+  `/api/bookmarks`: admin routes redirect to `/admin/login`, everything else
+  passes through. With env set, nothing changes. Judgment call: this lets the
+  auth-guard and login-form tests run everywhere, so only the
+  invalid-credentials test needs Supabase and is skipped without it.
+  `/submit`, `/my-list`, and `/onboarding` still 500 locally because the
+  pages themselves create a client; that's left alone here.
+- **Smoke tests** for `/deadlines`, `/compare`, `/api/resources`, and
+  `/llms.txt`.
+- **Expect timeout** raised to 10s. The directory's filters render after
+  hydration, and first visits on a cold server with all projects in parallel
+  occasionally passed 5s.
+- **Firefox** is kept. On macOS 27, Playwright's Firefox 157 build exits
+  with "Could not find profile folder" even when launched by hand with an
+  existing profile directory and after a clean reinstall, so it's the
+  local browser build, not the config.
+
 ## Issue #42 — Phase 3 wrap-up: admin roles and RLS
 
 Phase 3's features are #33 (bookmarks), #34 (personalization), #84
