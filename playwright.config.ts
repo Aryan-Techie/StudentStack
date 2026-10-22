@@ -46,6 +46,10 @@ export default defineConfig({
     timeout: 120000,
   },
   expect: {
+    // The directory's results and filters render after hydration, and the
+    // first visits on a cold server with every project running in parallel
+    // can take longer than the 5s default.
+    timeout: 10_000,
     toHaveScreenshot: {
       maxDiffPixels: 100,
     },

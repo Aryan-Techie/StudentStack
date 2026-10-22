@@ -6,6 +6,17 @@ import { NextResponse, type NextRequest } from "next/server";
 // redirect. It is not the security boundary: admin Server Actions re-check
 // with verifyAdmin() and submission actions re-check the signed-in user.
 export default async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isAdminRoute = pathname.startsWith("/admin") && pathname !== "/admin/login";
+
+  // Local dev without Supabase configured: behave as signed out, like
+  // /api/bookmarks, instead of throwing a 500 on every matched route.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    return isAdminRoute
+      ? NextResponse.redirect(new URL("/admin/login", request.url))
+      : NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -33,8 +44,6 @@ export default async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isAdminRoute = pathname.startsWith("/admin") && pathname !== "/admin/login";
   if (isAdminRoute && !user) {
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
