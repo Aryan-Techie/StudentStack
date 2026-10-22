@@ -44,6 +44,11 @@ database host may require IPv6 connectivity.
 Run `pnpm db:push` to apply the schema to your development database, then
 `pnpm dev` to start the app at <http://localhost:3000>.
 
+You can also run `pnpm dev` before setting anything up. Without `POSTGRES_URL` the
+app serves mock data, and without the two Supabase variables the pages that need
+sign-in (`/submit`, `/my-list`, `/onboarding`) show a "Sign-in isn't set up here"
+notice instead of the sign-in form.
+
 ### Seed data and migrations
 
 `offers.json` is intentionally ignored by Git. If you need the seeded directory,
