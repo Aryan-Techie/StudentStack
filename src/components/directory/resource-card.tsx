@@ -178,7 +178,7 @@ export function ResourceCard({
             <p className={styles.offerDesc}>{resource.description}</p>
           </button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className={styles.dialog}>
           <DialogHeader>
             <DialogTitle>{resource.name}</DialogTitle>
             <DialogDescription className="whitespace-pre-line">{resource.description}</DialogDescription>

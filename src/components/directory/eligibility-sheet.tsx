@@ -16,6 +16,7 @@ import {
   type EligibilityProfile,
 } from "@/lib/eligibility";
 import { BRANCHES, YEARS } from "@/lib/personalization";
+import styles from "./directory.module.css";
 
 const COUNTRIES: [string, string][] = [
   ["IN", "India"],
@@ -50,7 +51,7 @@ export function EligibilitySheet({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-h-[90vh] overflow-y-auto ${styles.dialog}`}>
         <DialogHeader>
           <DialogTitle>My eligibility</DialogTitle>
           <DialogDescription>
